@@ -6,9 +6,12 @@ from mutagen.mp4 import MP4, MP4FreeForm, MP4Cover
 import os
 import contextlib
 import sys
+import yt_dlp
 from yt_dlp import YoutubeDL
 from pydub import AudioSegment
 from ammr import ExtractMetadata
+import re
+import difflib
 
 # To take off all the logs
 
@@ -64,7 +67,15 @@ def add_metadata(file_path, image_path, artists, album, albumartist, albumsort, 
 
     # Numeric tags with conversion and error handling
 
-    audio["cpil"] = [0]
+    print("compilation tag is:")
+    print(compilation)
+    print("compilation after (int):")
+    print(int(compilation))
+    if compilation is not None:
+        try:
+            audio["cpil"] = [int(compilation)]
+        except Exception:
+            pass
 
     if discnumber is not None:
         try:
@@ -102,7 +113,11 @@ def add_metadata(file_path, image_path, artists, album, albumartist, albumsort, 
         except Exception:
             pass
 
-    audio["pgap"] = [0]
+    if itunesgapless is not None:
+        try:
+            audio["pgap"] = [int(itunesgapless)]
+        except Exception:
+            pass
 
     if itunesmediatype is not None:
         try:
@@ -125,13 +140,15 @@ def add_metadata(file_path, image_path, artists, album, albumartist, albumsort, 
 
     audio.save()
 
+    print("Written compilation tag:", audio.tags.get("cpil"))
+
 def recover_metadata(file_path):
     metadata = {}
-    with open(file_path, 'r') as f:
+    with open(file_path, 'r', encoding='utf-8') as f:  # <-- Add encoding
         for line in f:
             key, value = line.strip().split('| ', 1)
-            key = key.strip()  # <-- Strip whitespace from key
-            value = value.strip()  # (optional) Strip whitespace from value
+            key = key.strip()
+            value = value.strip()
             if key in metadata:
                 if isinstance(metadata[key], list):
                     metadata[key].append(value)
@@ -140,6 +157,24 @@ def recover_metadata(file_path):
             else:
                 metadata[key] = value
     return metadata
+
+def download_as_mp3(youtube_url):
+
+    ydl_opts = {
+        'format': 'bestaudio/best',
+        'outtmpl': '%(title)s/1 %(title)s.%(ext)s',
+        'postprocessors': [{
+            'key': 'FFmpegExtractAudio',
+            'preferredcodec': 'mp3',
+            'preferredquality': '320',
+        }],
+        'quiet': False,
+        'noplaylist': True,  # <-- Prevents downloading playlists/Mixes
+    }
+    with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+        info = ydl.extract_info(youtube_url, download=True)
+
+    return info['title']
 
 def download_playlist(url, audio_format='mp3', quality='192'):
 
@@ -190,7 +225,37 @@ def convert_all_mp3_to_m4a(folder_path, delete_original=False):
             except Exception as e:
                 print(f"Failed to convert {filename}: {e}")
 
+def normalize(s):
+    # Lowercase
+    s = s.lower()
+    # Remove extra words/phrases
+    for word in ["(clipofficiel)", "(officialvideo)", "(officialaudio)", "(visualizer)"]:
+        s = s.replace(word, "")
+    # Remove punctuation and special characters
+    s = re.sub(r"[.,\-’']", "", s)
+    # Remove spaces
+    s = s.replace(" ", "")
+    return s
 
+def find_best_metadata_file(title_folder, metadata_dir):
+    title_folder_norm = normalize(title_folder)
+    best_match = None
+    highest_ratio = 0
+
+    for filename in os.listdir(metadata_dir):
+        filename_norm = normalize(filename)
+        ratio = difflib.SequenceMatcher(None, title_folder_norm, filename_norm).ratio()
+        print(f"Comparing '{title_folder_norm}' with '{filename_norm}' => ratio: {ratio:.2f}")
+        if ratio > highest_ratio:
+            highest_ratio = ratio
+            best_match = filename
+
+    if best_match and highest_ratio > 0.5:
+        return os.path.join(metadata_dir, best_match)
+    else:
+        return None
+
+# Usage:
 app_dir = os.path.dirname(os.path.abspath(__file__))
 metadata_dir = os.path.join(app_dir, "metadata")
 os.makedirs(metadata_dir, exist_ok=True)
@@ -290,6 +355,8 @@ if not abort:
             else:
                 artists_list = [artists]
 
+            delete_others = False
+
             # Find the music file for this prefix
             for filename in os.listdir(matched_folder):
                 if filename.startswith(str(prefix)):
@@ -329,5 +396,105 @@ if not abort:
                         metadata.get("YEAR")
                     )
                     processed += 1
-                    break  # Only process one file per prefix
+                    break
+
             prefix += 1
+
+            if processed == int(metadata.get("TOTALTRACKS")):
+                delete_others = True
+                break
+
+            if delete_others:
+                for filename in os.listdir(matched_folder):
+                    if filename.startswith(str(prefix)):
+                        file_path = os.path.join(matched_folder, filename)
+                        try:
+                            os.remove(file_path)
+                            print(f"Deleted leftover mp3: {filename}")
+                        except Exception as e:
+                            print(f"Failed to delete {filename}: {e}")
+
+    else:
+
+        song = songs[0].find_element(By.CSS_SELECTOR, '.yt-simple-endpoint.style-scope.ytd-video-renderer')
+        song_url = song.get_attribute('href')
+
+        print(f"Downloading song from: {song_url}")
+        title_folder = download_as_mp3(song_url)
+        matched_folder = find_matching_folder(title_folder, app_dir)
+        convert_all_mp3_to_m4a(matched_folder, delete_original=True)
+
+        metadata_filepath = None
+        metadata_filepath = find_best_metadata_file(title_folder, metadata_dir)
+
+        metadata = recover_metadata(metadata_filepath)
+        filename = os.listdir(matched_folder)[0]
+
+        artists = metadata.get("ARTISTS")
+        if artists is None:
+            artists_list = []
+        elif isinstance(artists, list):
+            artists_list = artists
+        else:
+            artists_list = [artists]
+
+        music_filepath = os.path.join(matched_folder, filename)
+        new_music_filepath = os.path.join(
+            matched_folder,
+            os.path.splitext(os.path.basename(metadata_filepath))[0] + os.path.splitext(music_filepath)[1]
+        )
+        if music_filepath != new_music_filepath:
+            os.rename(music_filepath, new_music_filepath)
+            music_filepath = new_music_filepath
+
+        print('compilation tag is:')
+        print(metadata.get("COMPILATION"))
+
+        add_metadata(
+            music_filepath,
+            os.path.join(metadata_dir, 'artwork.jpg'),
+            artists_list,
+            metadata.get("ALBUM"),
+            metadata.get("ALBUMARTIST"),
+            metadata.get("ALBUMSORT"),
+            metadata.get("ARTIST"),
+            metadata.get("ARTISTSORT"),
+            metadata.get("COMPILATION"),
+            metadata.get("COPYRIGHT"),
+            metadata.get("DISCNUMBER"),
+            metadata.get("GENRE"),
+            metadata.get("ITUNESADVISORY"),
+            metadata.get("ITUNESALBUMID"),
+            metadata.get("ITUNESARTISTID"),
+            metadata.get("ITUNESCATALOGID"),
+            metadata.get("ITUNESGENREID"),
+            metadata.get("ITUNESGAPLESS"),
+            metadata.get("ITUNESMEDIATYPE"),
+            metadata.get("TITLE"),
+            metadata.get("TITLESORT"),
+            metadata.get("TOTALTRACKS"),
+            metadata.get("TRACK"),
+            metadata.get("YEAR")
+        )
+
+
+first_song = None
+for f in os.listdir(matched_folder):
+    if f.lower().endswith(('.m4a')):
+        first_song = os.path.join(matched_folder, f)
+        break
+
+if first_song:
+    audio = MP4(first_song)
+    album_tag = audio.tags.get('\xa9alb')
+    if album_tag and album_tag[0]:
+        album_name = album_tag[0]
+
+        safe_album_name = re.sub(r'[\\/:*?"<>|]', '', album_name).strip()
+        parent_dir = os.path.dirname(matched_folder)
+        new_folder_path = os.path.join(parent_dir, safe_album_name)
+        if not os.path.exists(new_folder_path):
+            os.rename(matched_folder, new_folder_path)
+            print(f"Renamed folder to: {safe_album_name}")
+        else:
+            print(f"Folder '{safe_album_name}' already exists, not renamed.")

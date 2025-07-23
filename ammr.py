@@ -339,90 +339,92 @@ def menu():
     print('')
 
 
-app_dir = os.path.dirname(os.path.abspath(__file__))
-metadata_dir = os.path.join(app_dir, "metadata")
-os.makedirs(metadata_dir, exist_ok=True)
+if __name__ == "__main__":
 
-for filename in os.listdir(metadata_dir):
-    file_path = os.path.join(metadata_dir, filename)
-    try:
-        if os.path.isfile(file_path) or os.path.islink(file_path):
-            os.unlink(file_path)
-        elif os.path.isdir(file_path):
-            shutil.rmtree(file_path)
-    except Exception as e:
-        print(f'Failed to delete {file_path}. Reason: {e}')
+    app_dir = os.path.dirname(os.path.abspath(__file__))
+    metadata_dir = os.path.join(app_dir, "metadata")
+    os.makedirs(metadata_dir, exist_ok=True)
 
-init(autoreset=True) 
-quit = False
+    for filename in os.listdir(metadata_dir):
+        file_path = os.path.join(metadata_dir, filename)
+        try:
+            if os.path.isfile(file_path) or os.path.islink(file_path):
+                os.unlink(file_path)
+            elif os.path.isdir(file_path):
+                shutil.rmtree(file_path)
+        except Exception as e:
+            print(f'Failed to delete {file_path}. Reason: {e}')
 
-startmess()
-contin()
-clear()
-while not quit:
-    menu()
-    choice = input('Choose an option: ')
-    print('')
-    match choice:
-        case '1':
+    init(autoreset=True) 
+    quit = False
+
+    startmess()
+    contin()
+    clear()
+    while not quit:
+        menu()
+        choice = input('Choose an option: ')
+        print('')
+        match choice:
+            case '1':
 
 
-            title = input("Enter the name of the song/album: ")
-            artist = input("Enter the name of the artist: ")
-            print('\n')
-            url = f"https://music.apple.com/us/search?term={title.replace(' ', '%20')}%20{artist.replace(' ', '%20')}"
+                title = input("Enter the name of the song/album: ")
+                artist = input("Enter the name of the artist: ")
+                print('\n')
+                url = f"https://music.apple.com/us/search?term={title.replace(' ', '%20')}%20{artist.replace(' ', '%20')}"
 
-            options = webdriver.ChromeOptions()
-            options.add_experimental_option('excludeSwitches', ['enable-logging'])
-            options.add_argument("--headless")
-            options.add_argument("--log-level=3")
-            options.add_argument("--disable-logging")
-            options.add_argument("--disable-gpu")
-            options.add_argument("--no-sandbox")
+                options = webdriver.ChromeOptions()
+                options.add_experimental_option('excludeSwitches', ['enable-logging'])
+                options.add_argument("--headless")
+                options.add_argument("--log-level=3")
+                options.add_argument("--disable-logging")
+                options.add_argument("--disable-gpu")
+                options.add_argument("--no-sandbox")
 
-            service = Service(log_path=os.devnull)
+                service = Service(log_path=os.devnull)
 
-            with suppress_stderr():
-                driver = webdriver.Chrome(service=service, options=options)
+                with suppress_stderr():
+                    driver = webdriver.Chrome(service=service, options=options)
 
-            driver.get(url)
+                driver.get(url)
 
-            grid_elem = driver.find_elements(By.CSS_SELECTOR, '.grid-item.svelte-1a54yxp')
-            id = 0
-            found = False
-            abort = False
-            while not found:
+                grid_elem = driver.find_elements(By.CSS_SELECTOR, '.grid-item.svelte-1a54yxp')
+                id = 0
+                found = False
+                abort = False
+                while not found:
 
-                if id == len(grid_elem):
-                    print(Fore.RED + "\nNo results found for your search. Aborting...")
-                    found = True
-                    abort = True
-                else:
-                    Name = grid_elem[id].find_element(By.CSS_SELECTOR, '.top-search-lockup__primary__title.svelte-bg2ql4[dir="auto"]').get_attribute("textContent").strip()
-                    Details = grid_elem[id].find_element(By.CSS_SELECTOR, '.top-search-lockup__secondary.svelte-bg2ql4[data-testid="top-search-result-subtitle"]').get_attribute("textContent").strip()
-                    prompt = "Did you search for : " + Name + " / " + Details
-                    proceed = get_yes_no(prompt)
-                    if proceed == "yes":
+                    if id == len(grid_elem):
+                        print(Fore.RED + "\nNo results found for your search. Aborting...")
                         found = True
+                        abort = True
                     else:
-                        id = id + 1
-                
-                pass
+                        Name = grid_elem[id].find_element(By.CSS_SELECTOR, '.top-search-lockup__primary__title.svelte-bg2ql4[dir="auto"]').get_attribute("textContent").strip()
+                        Details = grid_elem[id].find_element(By.CSS_SELECTOR, '.top-search-lockup__secondary.svelte-bg2ql4[data-testid="top-search-result-subtitle"]').get_attribute("textContent").strip()
+                        prompt = "Did you search for : " + Name + " / " + Details
+                        proceed = get_yes_no(prompt)
+                        if proceed == "yes":
+                            found = True
+                        else:
+                            id = id + 1
+                    
+                    pass
 
-            if not abort:
+                if not abort:
 
-                ExtractMetadata(driver, id, metadata_dir)
+                    ExtractMetadata(driver, id, metadata_dir)
 
-                print(Fore.GREEN + '\nMetadata retrieved successfully. Access it in the metadata folder.')
+                    print(Fore.GREEN + '\nMetadata retrieved successfully. Access it in the metadata folder.')
 
-            contin()
+                contin()
 
-        case '2':
+            case '2':
 
-            print(Fore.LIGHTWHITE_EX + '\nExiting...')
-            quit = True
+                print(Fore.LIGHTWHITE_EX + '\nExiting...')
+                quit = True
 
-        case default:
+            case default:
 
-            print(Fore.RED + 'Enter a valid choice\n')
-            contin()
+                print(Fore.RED + 'Enter a valid choice\n')
+                contin()
