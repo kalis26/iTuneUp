@@ -8,6 +8,7 @@ import contextlib
 import sys
 from yt_dlp import YoutubeDL
 from pydub import AudioSegment
+from ammr import ExtractMetadata
 
 # To take off all the logs
 
@@ -20,6 +21,15 @@ def suppress_stderr():
             yield
         finally:
             sys.stderr = old_stderr
+
+# Yes/No input
+
+def get_yes_no(prompt):
+    while True:
+        answer = input(prompt + " (yes/no): ").strip().lower()
+        if answer in ("yes", "no"):
+            return answer
+        print("Please enter 'yes' or 'no'.")
 
 def add_metadata(file_path, image_path, artists, album, albumartist, albumsort, artist, artistsort, compilation, copyright, 
                  discnumber, genre, itunesadvisory, itunesalbumid, itunesartistid, itunescatalogid, itunesgenreid,
@@ -188,9 +198,9 @@ os.makedirs(metadata_dir, exist_ok=True)
 title = input("Enter the name of the song/album: ")
 artist = input("Enter the name of the artist: ")
 print('\n')
-title_query = title.replace(' ', '+').replace("'", '%27')
-artist_query = artist.replace(' ', '+').replace("'", '%27')
-url = f"https://www.youtube.com/results?search_query={title_query}+{artist_query}"
+
+urlApple = f"https://music.apple.com/us/search?term={title.replace(' ', '%20')}%20{artist.replace(' ', '%20')}"
+
 
 options = webdriver.ChromeOptions()
 options.add_argument("--headless")
@@ -200,89 +210,124 @@ service = Service(log_path=os.devnull)
 with suppress_stderr():
     driver = webdriver.Chrome(service=service, options=options)
 
-driver.get(url)
 
-try:
+driver.get(urlApple)
 
-    album_playlist = driver.find_element(By.CSS_SELECTOR, '.yt-simple-endpoint.style-scope.ytd-watch-card-rich-header-renderer')
-    playlist_url = album_playlist.get_attribute('href')
+grid_elem = driver.find_elements(By.CSS_SELECTOR, '.grid-item.svelte-1a54yxp')
+id = 0
+found = False
+abort = False
+while not found:
 
-except NoSuchElementException:
-
-    songs = driver.find_elements(By.CSS_SELECTOR, '.style-scope.ytd-video-renderer')
-
-if playlist_url:
-
-    # print(f"Downloading playlist from: {playlist_url}")
-    # download_playlist(playlist_url)
-
-    matched_folder = find_matching_folder(title, app_dir)
-    file_count = len([f for f in os.listdir(matched_folder) if os.path.isfile(os.path.join(matched_folder, f))])
-
-    convert_all_mp3_to_m4a(matched_folder, delete_original=True)
-
-    prefix = 1
-    processed = 0
-    while processed < file_count:
-
-        metadata_filepath = None
-        for filename in os.listdir(metadata_dir):
-            if filename.startswith(str(prefix)):
-                metadata_filepath = os.path.join(metadata_dir, filename)
-                break
-
-        if metadata_filepath is None:
-            prefix += 1
-            continue
-
-        metadata = recover_metadata(metadata_filepath)
-
-        artists = metadata.get("ARTISTS")
-        if artists is None:
-            artists_list = []
-        elif isinstance(artists, list):
-            artists_list = artists
+    if id == len(grid_elem):
+        print("\nNo results found for your search. Aborting...")
+        found = True
+        abort = True
+    else:
+        Name = grid_elem[id].find_element(By.CSS_SELECTOR, '.top-search-lockup__primary__title.svelte-bg2ql4[dir="auto"]').get_attribute("textContent").strip()
+        Details = grid_elem[id].find_element(By.CSS_SELECTOR, '.top-search-lockup__secondary.svelte-bg2ql4[data-testid="top-search-result-subtitle"]').get_attribute("textContent").strip()
+        prompt = "Did you search for : " + Name + " / " + Details
+        proceed = get_yes_no(prompt)
+        if proceed == "yes":
+            found = True
         else:
-            artists_list = [artists]
+            id = id + 1
+                
+    pass
 
-        # Find the music file for this prefix
-        for filename in os.listdir(matched_folder):
-            if filename.startswith(str(prefix)):
-                music_filepath = os.path.join(matched_folder, filename)
-                new_music_filepath = os.path.join(
-                    matched_folder,
-                    os.path.splitext(os.path.basename(metadata_filepath))[0] + os.path.splitext(music_filepath)[1]
-                )
-                if music_filepath != new_music_filepath:
-                    os.rename(music_filepath, new_music_filepath)
-                    music_filepath = new_music_filepath
+if not abort:
 
-                add_metadata(
-                    music_filepath,
-                    os.path.join(metadata_dir, 'artwork.jpg'),
-                    artists_list,
-                    metadata.get("ALBUM"),
-                    metadata.get("ALBUMARTIST"),
-                    metadata.get("ALBUMSORT"),
-                    metadata.get("ARTIST"),
-                    metadata.get("ARTISTSORT"),
-                    metadata.get("COMPILATION"),
-                    metadata.get("COPYRIGHT"),
-                    metadata.get("DISCNUMBER"),
-                    metadata.get("GENRE"),
-                    metadata.get("ITUNESADVISORY"),
-                    metadata.get("ITUNESALBUMID"),
-                    metadata.get("ITUNESARTISTID"),
-                    metadata.get("ITUNESCATALOGID"),
-                    metadata.get("ITUNESGENREID"),
-                    metadata.get("ITUNESGAPLESS"),
-                    metadata.get("ITUNESMEDIATYPE"),
-                    metadata.get("TITLE"),
-                    metadata.get("TITLESORT"),
-                    metadata.get("TOTALTRACKS"),
-                    metadata.get("TRACK"),
-                    metadata.get("YEAR")
-                )
-                processed += 1
-                break  # Only process one file per prefix
-        prefix += 1
+    title, artist = ExtractMetadata(driver, id, metadata_dir)
+
+    title_query = title.replace(' ', '+').replace("'", '%27')
+    artist_query = artist.replace(' ', '+').replace("'", '%27')
+
+    url = f"https://www.youtube.com/results?search_query={title_query}+{artist_query}"
+
+    driver.get(url)
+
+    try:
+
+        album_playlist = driver.find_element(By.CSS_SELECTOR, '.yt-simple-endpoint.style-scope.ytd-watch-card-rich-header-renderer')
+        playlist_url = album_playlist.get_attribute('href')
+
+    except NoSuchElementException:
+        playlist_url = None
+
+        songs = driver.find_elements(By.CSS_SELECTOR, '.style-scope.ytd-video-renderer')
+
+    if playlist_url:
+
+        print(f"Downloading playlist from: {playlist_url}")
+        download_playlist(playlist_url)
+
+        matched_folder = find_matching_folder(title, app_dir)
+        file_count = len([f for f in os.listdir(matched_folder) if os.path.isfile(os.path.join(matched_folder, f))])
+
+        convert_all_mp3_to_m4a(matched_folder, delete_original=True)
+
+        prefix = 1
+        processed = 0
+        while processed < file_count:
+
+            metadata_filepath = None
+            for filename in os.listdir(metadata_dir):
+                if filename.startswith(str(prefix)):
+                    metadata_filepath = os.path.join(metadata_dir, filename)
+                    break
+
+            if metadata_filepath is None:
+                prefix += 1
+                continue
+
+            metadata = recover_metadata(metadata_filepath)
+
+            artists = metadata.get("ARTISTS")
+            if artists is None:
+                artists_list = []
+            elif isinstance(artists, list):
+                artists_list = artists
+            else:
+                artists_list = [artists]
+
+            # Find the music file for this prefix
+            for filename in os.listdir(matched_folder):
+                if filename.startswith(str(prefix)):
+                    music_filepath = os.path.join(matched_folder, filename)
+                    new_music_filepath = os.path.join(
+                        matched_folder,
+                        os.path.splitext(os.path.basename(metadata_filepath))[0] + os.path.splitext(music_filepath)[1]
+                    )
+                    if music_filepath != new_music_filepath:
+                        os.rename(music_filepath, new_music_filepath)
+                        music_filepath = new_music_filepath
+
+                    add_metadata(
+                        music_filepath,
+                        os.path.join(metadata_dir, 'artwork.jpg'),
+                        artists_list,
+                        metadata.get("ALBUM"),
+                        metadata.get("ALBUMARTIST"),
+                        metadata.get("ALBUMSORT"),
+                        metadata.get("ARTIST"),
+                        metadata.get("ARTISTSORT"),
+                        metadata.get("COMPILATION"),
+                        metadata.get("COPYRIGHT"),
+                        metadata.get("DISCNUMBER"),
+                        metadata.get("GENRE"),
+                        metadata.get("ITUNESADVISORY"),
+                        metadata.get("ITUNESALBUMID"),
+                        metadata.get("ITUNESARTISTID"),
+                        metadata.get("ITUNESCATALOGID"),
+                        metadata.get("ITUNESGENREID"),
+                        metadata.get("ITUNESGAPLESS"),
+                        metadata.get("ITUNESMEDIATYPE"),
+                        metadata.get("TITLE"),
+                        metadata.get("TITLESORT"),
+                        metadata.get("TOTALTRACKS"),
+                        metadata.get("TRACK"),
+                        metadata.get("YEAR")
+                    )
+                    processed += 1
+                    break  # Only process one file per prefix
+            prefix += 1
