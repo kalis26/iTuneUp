@@ -67,10 +67,6 @@ def add_metadata(file_path, image_path, artists, album, albumartist, albumsort, 
 
     # Numeric tags with conversion and error handling
 
-    print("compilation tag is:")
-    print(compilation)
-    print("compilation after (int):")
-    print(int(compilation))
     if compilation is not None:
         try:
             audio["cpil"] = [int(compilation)]
@@ -446,9 +442,6 @@ if not abort:
         if music_filepath != new_music_filepath:
             os.rename(music_filepath, new_music_filepath)
             music_filepath = new_music_filepath
-
-        print('compilation tag is:')
-        print(metadata.get("COMPILATION"))
 
         add_metadata(
             music_filepath,
