@@ -154,29 +154,29 @@ def recover_metadata(file_path):
                 metadata[key] = value
     return metadata
 
-def download_as_mp3(youtube_url):
+def download_as_mp3(youtube_url, library_dir):
 
     ydl_opts = {
         'format': 'bestaudio/best',
-        'outtmpl': '%(title)s/1 %(title)s.%(ext)s',
+        'outtmpl':  os.path.join(library_dir, '%(title)s/1 %(title)s.%(ext)s'),
         'postprocessors': [{
             'key': 'FFmpegExtractAudio',
             'preferredcodec': 'mp3',
             'preferredquality': '320',
         }],
         'quiet': False,
-        'noplaylist': True,  # <-- Prevents downloading playlists/Mixes
+        'noplaylist': True,
     }
     with yt_dlp.YoutubeDL(ydl_opts) as ydl:
         info = ydl.extract_info(youtube_url, download=True)
 
     return info['title']
 
-def download_playlist(url, audio_format='mp3', quality='192'):
+def download_playlist(url, library_dir, audio_format='mp3', quality='320'):
 
     ydl_opts = {
         'format': 'bestaudio/best',
-        'outtmpl': '%(playlist_title)s/%(playlist_index)d %(title)s.%(ext)s',
+        'outtmpl': os.path.join(library_dir, '%(playlist_title)s/%(playlist_index)d %(title)s.%(ext)s'),
         'ignoreerrors': True,
         'quiet': False,
         'postprocessors': [{
@@ -200,7 +200,7 @@ def find_matching_folder(search_title, directory):
             normalized_folder = folder.lower().replace(' ', '')
             if normalized_folder == normalized_search:
 
-                return folder
+                return os.path.join(directory, folder)
             
     return None
 
@@ -254,7 +254,9 @@ def find_best_metadata_file(title_folder, metadata_dir):
 # Usage:
 app_dir = os.path.dirname(os.path.abspath(__file__))
 metadata_dir = os.path.join(app_dir, "metadata")
+library_dir = os.path.join(app_dir, "library")
 os.makedirs(metadata_dir, exist_ok=True)
+os.makedirs(library_dir, exist_ok=True)
 
 title = input("Enter the name of the song/album: ")
 artist = input("Enter the name of the artist: ")
@@ -320,9 +322,9 @@ if not abort:
     if playlist_url:
 
         print(f"Downloading playlist from: {playlist_url}")
-        download_playlist(playlist_url)
+        download_playlist(playlist_url, library_dir)
 
-        matched_folder = find_matching_folder(title, app_dir)
+        matched_folder = find_matching_folder(title, library_dir)
         file_count = len([f for f in os.listdir(matched_folder) if os.path.isfile(os.path.join(matched_folder, f))])
 
         convert_all_mp3_to_m4a(matched_folder, delete_original=True)
@@ -416,8 +418,8 @@ if not abort:
         song_url = song.get_attribute('href')
 
         print(f"Downloading song from: {song_url}")
-        title_folder = download_as_mp3(song_url)
-        matched_folder = find_matching_folder(title_folder, app_dir)
+        title_folder = download_as_mp3(song_url, library_dir)
+        matched_folder = find_matching_folder(title_folder, library_dir)
         convert_all_mp3_to_m4a(matched_folder, delete_original=True)
 
         metadata_filepath = None
