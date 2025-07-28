@@ -251,6 +251,20 @@ def find_best_metadata_file(title_folder, metadata_dir):
     else:
         return None
 
+def cleanup_metadata_dir(metadata_dir):
+
+    for filename in os.listdir(metadata_dir):
+        file_path = os.path.join(metadata_dir, filename)
+        if os.path.isfile(file_path):
+
+            if (filename.lower().endswith(('.txt', '.jpg', '.jpeg', '.png', '.gif', '.bmp', '.webp')) 
+                and filename != 'README.md'):
+                try:
+                    os.remove(file_path)
+                    print(f"Cleaned up: {filename}")
+                except Exception as e:
+                    print(f"Failed to remove {filename}: {e}")
+
 # Usage:
 app_dir = os.path.dirname(os.path.abspath(__file__))
 metadata_dir = os.path.join(app_dir, "metadata")
@@ -493,3 +507,7 @@ if first_song:
             print(f"Renamed folder to: {safe_album_name}")
         else:
             print(f"Folder '{safe_album_name}' already exists, not renamed.")
+
+cleanup_metadata_dir(metadata_dir)
+
+driver.quit()
