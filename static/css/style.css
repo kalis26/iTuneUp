@@ -1,0 +1,209 @@
+@font-face {
+    font-family: 'SF PRO Regular';
+    src: url(../fonts/SF-Pro-Display-Regular.otf) format(opentype);
+    font-weight: 400;
+    font-style: normal;
+}
+
+@font-face {
+    font-family: 'SF PRO Bold';
+    src: url(../fonts/SF-Pro-Display-Bold.otf) format(opentype);
+    font-weight: 700;
+    font-style: normal;
+}
+
+@font-face {
+    font-family: 'SF UI Text Regular';
+    src: url(../fonts/SFUIText-Regular.otf) format(opentype);
+    font-weight: 400;
+    font-style: normal;
+}
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+.side-nav{
+    font-family: 'SF UI Text Regular';
+    background-color: #FFFFFF;
+    height: 100%;
+    width: 260px;
+    position: fixed;
+    border-right: 1px solid #E0E0E0;
+}
+
+.side-nav ul{
+    width: 240px;
+    margin: 10px;
+    padding: 0;
+    list-style-type: none;
+}
+
+.side-nav li{
+    margin-bottom: 12px;
+    padding-top: 8px;
+    padding-bottom: 8px;
+    border-radius: 10px;
+}
+
+.side-nav li:hover{
+    background-color: #F7F7F7;
+}
+
+.side-nav img{
+    margin-right: 15px;
+    margin-left: 15px;
+    width: 24px;
+    height: 24px;
+}
+
+.side-nav a{
+    display: flex;
+    align-items: center;
+    font-size: 16px;
+    text-decoration: none;
+    color: black;
+}
+
+.active{
+    background-color: #F7F7F7;
+}
+
+.side-nav h3{
+    font-family: 'SF PRO Bold';
+    margin-left: 40px;
+    margin-top: 30px;
+    margin-bottom: 20px;
+}
+
+.footer{
+    font-family: 'SF PRO Regular';
+    font-size: 12px;
+    margin-left: 43px;
+    position: fixed;
+    bottom: 0px;
+}
+
+.footer p{
+    color: #7E7D7D;
+    margin: 0;
+}
+
+.content{
+    font-family: 'SF PRO Regular';
+    height: 100vh;
+    margin-left: 260px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+}
+
+.content h1{
+    font-family: 'SF PRO Bold';
+    font-size: 64px;
+    text-shadow: 0 4px 4px rgba(0, 0, 0, 0.25);
+}
+
+.content h3{
+    font-family: 'SF PRO Regular';
+    font-size: 32px;
+    text-shadow: 0 4px 4px rgba(0, 0, 0, 0.25);
+}
+
+.form-container{
+    margin-top: 60px;
+    padding: 2px;
+    border-radius: 35px;
+    background: linear-gradient(90deg, #FFFFFF, #0000001a);
+    transition: background 0.2s ease;
+    display: inline-block;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
+}
+
+form{
+    border-radius: 33px;
+    background-color: #F5F5F5;
+    margin-top: 40px;
+    padding: 20px;
+    z-index: 1;
+    position: relative;
+    outline: none;
+    border: none;
+    margin: 0;
+}
+
+.input-container{
+    position: relative;
+    display: inline-block;
+    margin-bottom: 15px;
+    margin-left: 15px;
+    margin-right: 15px;
+}
+
+#top-container{
+    margin-top: 15px;
+}
+
+.form-input{
+    width: 700px;
+    border-radius: 30px;
+    background-color: #FFFFFF;
+    color: black;
+    border: 1px solid #E0E0E0;
+    outline: none;
+    padding: 16px 16px; 
+    box-sizing: border-box;
+    font-family: 'SF UI Text Regular';
+    font-size: 16px;
+}
+
+.form-input::placeholder{
+    font-family: 'SF UI Text Regular';
+    font-size: 16px;
+}
+
+.form-button-container {
+    display: block;
+    margin: 15px auto;
+    padding: 0.5px;
+    border-radius: 30px;
+    background: linear-gradient(90deg, #0091FF, #00ffea);
+    transition: background 0.2s ease;
+    width: fit-content;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
+}
+
+.form-button{
+    display: block;
+    margin: 0;
+    padding: 15px 35px;
+    background-color: #0091FF;
+    color: white;
+    border: none;
+    border-radius: 25px;
+    font-size: 16px;
+    cursor: pointer;
+    transition: color 0.2s ease, background-color 0.2s ease;
+}
+
+.clear-btn{
+    position: absolute;
+    right: 12px;
+    top: 50%;
+    transform: translateY(-50%);
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    user-select: none;
+
+}
+
+
+#license{
+    margin-bottom: 1em;
+    margin-left: 5px;
+}

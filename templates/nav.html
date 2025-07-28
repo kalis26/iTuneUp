@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Navigation Template</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body>
+    <nav class="side-nav">
+        <h3>iTuneUp</h3>
+        <ul>
+            <li class="{% if active_page == 'Home' %}active{% endif %}">
+                <a href="{{ url_for('home') }}">
+                    <img src="{{ url_for('static', filename='images/home.png') }}">
+                    Home
+                </a>
+            </li>
+            <li class="{% if active_page == 'Search' %}active{% endif %}">
+                <a href="{{ url_for('library') }}">
+                    <img src="{{ url_for('static', filename='images/library.png') }}">
+                    Library
+                </a>
+            </li>
+            <li class="{% if active_page == 'Settings' %}active{% endif %}">
+                <a href="{{ url_for('settings') }}">
+                    <img src="{{ url_for('static', filename='images/settings.png') }}">
+                    Settings
+                </a>
+            </li>
+        </ul>
+        <div class="footer">
+            <p>&copy; 2025 Amine Mustapha Rachid</p>
+            <p id="license">Licensed under the MIT license</p>
+        </div>
+    </nav>
+    <div class="content">
+        {% block content %}
+
+        {% endblock %}
+    </div>
+
+    {% block scripts %}
+    
+    {% endblock %}
+    
+</body>
+</html>

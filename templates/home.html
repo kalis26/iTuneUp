@@ -1,0 +1,43 @@
+{% extends 'nav.html' %}
+
+{% block title %}Home - iTuneUp{% endblock %}
+
+{% block content %}
+
+    <h1>Welcome to iTuneUp</h1>
+    <h3>Search for your desired song or album</h3>
+    
+    <div class="form-container">
+        <form action="" method="post">
+            <p>
+                <div class="input-container" id="top-container">
+                    {{form.album(class="form-input", size=30)}}
+                    <span class="clear-btn" onclick="document.getElementById('album').value = '';">
+                        <img src="{{ url_for('static', filename='images/clear.png') }}" alt="Clear">
+                    </span>
+                </div>
+            </p>
+            <p>
+                <div class="input-container">
+                    {{form.artist(class="form-input", size=30)}}
+                    <span class="clear-btn" onclick="document.getElementById('artist').value = '';">
+                        <img src="{{ url_for('static', filename='images/clear.png') }}" alt="Clear">
+                    </span>
+                </div>
+            </p>
+            <p>
+                <div class="form-button-container">
+                    {{form.search(class="form-button")}}
+                </div>
+                
+            </p>
+        </form>
+    </div>
+
+{% endblock %}
+
+{% block scripts %}
+
+<script src="{{ url_for('static', filename='JS/main.js') }}"></script>
+
+{% endblock %}
