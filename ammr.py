@@ -37,9 +37,22 @@ def get_yes_no(prompt):
         
 # Function to extract the Albums ID
 
-def ExtractAlbumID(argument, id):
+def ExtractAlbumID(url, id):
 
-    elements_with_class = argument.find_elements(By.CSS_SELECTOR, ".click-action.svelte-c0t0j2")
+    options = webdriver.ChromeOptions()
+    options.add_experimental_option('excludeSwitches', ['enable-logging'])
+    options.add_argument("--headless")
+    options.add_argument("--log-level=3")
+    options.add_argument("--disable-logging")
+    options.add_argument("--disable-gpu")
+    options.add_argument("--no-sandbox")
+    service = Service(log_path=os.devnull)
+    with suppress_stderr():
+        driver = webdriver.Chrome(service=service, options=options)
+
+    driver.get(url)
+
+    elements_with_class = driver.find_elements(By.CSS_SELECTOR, ".click-action.svelte-c0t0j2")
 
     url = elements_with_class[id].get_attribute("href")
 

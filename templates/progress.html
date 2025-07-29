@@ -1,0 +1,30 @@
+{% extends 'nav.html' %}
+
+{% block title %}Download Progress - iTuneUp{% endblock %}
+
+{% block content %}
+
+    <div class="progress-container" id="task-container" data-task-id="{{ task_id }}">
+        <h1 class="progress-title">Download in Progress</h1>
+
+        <div class="progress-wrapper">
+            <div class="progress-bar-container">
+                <div class="progress-bar" id="progressBar">
+                    <div class="progress-fill" id="progressFill"></div>
+                </div>
+                <div class="progress-text" id="progressText">0%</div>
+            </div>
+            <div class="progress-message" id="progressMessage">Starting download...</div>
+        </div>
+    </div>
+
+{% endblock %}
+
+{% block scripts %}
+
+<script>
+    const taskID = '{{ task_id }}';
+</script>
+<script src="{{ url_for('static', filename='js/main.js') }}"></script>
+
+{% endblock %}

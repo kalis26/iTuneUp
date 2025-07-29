@@ -14,12 +14,16 @@ from pydub import AudioSegment
 from ammr import ExtractMetadata
 import re
 import difflib
+import threading
+import time
+import uuid
 
 app = Flask(__name__)
 app.config['SECRET_KEY'] = 'Password1594826kjk!'
 
 @contextlib.contextmanager
 def suppress_stderr():
+
     with open(os.devnull, 'w') as devnull:
         old_stderr = sys.stderr
         sys.stderr = devnull
@@ -29,6 +33,7 @@ def suppress_stderr():
             sys.stderr = old_stderr
 
 def get_yes_no(prompt):
+
     while True:
         answer = input(prompt + " (yes/no): ").strip().lower()
         if answer in ("yes", "no"):
@@ -65,8 +70,6 @@ def add_metadata(file_path, image_path, artists, album, albumartist, albumsort, 
         audio["sonm"] = [titlesort]
     if year:
         audio["\xa9day"] = [year]
-
-    # Numeric tags with conversion and error handling
 
     if compilation is not None:
         try:
@@ -129,7 +132,6 @@ def add_metadata(file_path, image_path, artists, album, albumartist, albumsort, 
         except Exception:
             pass
 
-    # Cover art
     if image_path and os.path.exists(image_path):
         with open(image_path, 'rb') as f:
             cover = f.read()
@@ -152,6 +154,7 @@ def recover_metadata(file_path):
                     metadata[key] = [metadata[key], value]
             else:
                 metadata[key] = value
+
     return metadata
 
 def download_as_mp3(youtube_url, library_dir):
@@ -205,6 +208,7 @@ def find_matching_folder(search_title, directory):
     return None
 
 def convert_all_mp3_to_m4a(folder_path, delete_original=False):
+
     for filename in os.listdir(folder_path):
         if filename.lower().endswith(".mp3"):
             mp3_path = os.path.join(folder_path, filename)
@@ -284,10 +288,10 @@ def show_search_results(form, confirm_form, title, artist, searchid):
         driver = webdriver.Chrome(service=service, options=options)
 
     try:
+
         urlApple = f"https://music.apple.com/us/search?term={title.replace(' ', '%20')}%20{artist.replace(' ', '%20')}"
         driver.get(urlApple)
 
-        # Get fresh elements every time
         grid_elem = driver.find_elements(By.CSS_SELECTOR, '.grid-item.svelte-1a54yxp')
 
         if not grid_elem:
@@ -298,20 +302,17 @@ def show_search_results(form, confirm_form, title, artist, searchid):
             flash('No more results found.')
             return render_template('home.html', form=form, confirm_form=confirm_form, active_page='Home')
 
-        # Get the specific result
         current_element = grid_elem[searchid]
         
         try:
             Name = current_element.find_element(By.CSS_SELECTOR, '.top-search-lockup__primary__title.svelte-bg2ql4[dir="auto"]').get_attribute("textContent").strip()
             Details = current_element.find_element(By.CSS_SELECTOR, '.top-search-lockup__secondary.svelte-bg2ql4[data-testid="top-search-result-subtitle"]').get_attribute("textContent").strip()
-            
-            # Get image
+
             IMG = current_element.find_element(By.CSS_SELECTOR, '.svelte-uduhys')
             IMGCON = IMG.find_element(By.CSS_SELECTOR, 'source')
             srcset = IMGCON.get_attribute("srcset")
             imgurl = srcset.split(',')[1].split(' ')[0].strip()
 
-            # Store the data in session for the "Yes" action
             session['current_search'] = {
                 'name': Name,
                 'details': Details,
@@ -336,19 +337,281 @@ def show_search_results(form, confirm_form, title, artist, searchid):
     finally:
         driver.quit()
 
+download_progress = {}
+
+def update_progress(task_id, message, percentage):
+
+    download_progress[task_id] = {
+        'message': message,
+        'percentage': percentage,
+        'timestamp': time.time()
+    }
+
+def download_with_progress(current_search, task_id):
+
+    try:
+
+        update_progress(task_id, 'Initializing download...', 5)
+
+        title = current_search['title']
+        artist = current_search['artist']
+
+        url = f"https://music.apple.com/us/search?term={title.replace(' ', '%20')}%20{artist.replace(' ', '%20')}"
+        id = current_search['id']
+
+        metadata_dir, library_dir = setup_directories()
+        update_progress(task_id, "Setting up directories...", 10)
+
+        title, artist = ExtractMetadata(url, id, metadata_dir)
+
+        title = title.replace(" - Single", "").strip()
+
+        title_query = title.replace(' ', '+').replace("'", '%27')
+        artist_query = artist.replace(' ', '+').replace("'", '%27')
+
+        url = f"https://www.youtube.com/results?search_query={title_query}+{artist_query}"
+
+        update_progress(task_id, "Searching for content...", 20)
+
+        options = webdriver.ChromeOptions()
+        options.add_argument("--headless")
+        service = Service(log_path=os.devnull)
+
+        driver = webdriver.Chrome(options=options, service=service)
+        driver.get(url)
+
+        try:
+
+            album_playlist = driver.find_element(By.CSS_SELECTOR, '.yt-simple-endpoint.style-scope.ytd-watch-card-rich-header-renderer')
+            playlist_url = album_playlist.get_attribute('href')
+
+        except NoSuchElementException:
+            playlist_url = None
+
+            songs = driver.find_elements(By.CSS_SELECTOR, '.style-scope.ytd-video-renderer')
+
+        if playlist_url:
+
+            update_progress(task_id, "Downloading album...", 30)
+
+            print(f"Downloading playlist from: {playlist_url}")
+            download_playlist(playlist_url, library_dir)
+
+            matched_folder = find_matching_folder(title, library_dir)
+            file_count = len([f for f in os.listdir(matched_folder) if os.path.isfile(os.path.join(matched_folder, f))])
+
+            update_progress(task_id, "Converting files...", 60)
+            convert_all_mp3_to_m4a(matched_folder, delete_original=True)
+
+            update_progress(task_id, "Adding metadata...", 80)
+            prefix = 1
+            processed = 0
+            while processed < file_count:
+
+                metadata_filepath = None
+                for filename in os.listdir(metadata_dir):
+                    if filename.startswith(str(prefix)):
+                        metadata_filepath = os.path.join(metadata_dir, filename)
+                        break
+
+                if metadata_filepath is None:
+                    prefix += 1
+                    continue
+
+                metadata = recover_metadata(metadata_filepath)
+
+                artists = metadata.get("ARTISTS")
+                if artists is None:
+                    artists_list = []
+                elif isinstance(artists, list):
+                    artists_list = artists
+                else:
+                    artists_list = [artists]
+
+                delete_others = False
+
+                # Find the music file for this prefix
+                for filename in os.listdir(matched_folder):
+                    if filename.startswith(str(prefix)):
+                        music_filepath = os.path.join(matched_folder, filename)
+                        new_music_filepath = os.path.join(
+                            matched_folder,
+                            os.path.splitext(os.path.basename(metadata_filepath))[0] + os.path.splitext(music_filepath)[1]
+                        )
+                        if music_filepath != new_music_filepath:
+                            os.rename(music_filepath, new_music_filepath)
+                            music_filepath = new_music_filepath
+
+                        add_metadata(
+                            music_filepath,
+                            os.path.join(metadata_dir, 'artwork.jpg'),
+                            artists_list,
+                            metadata.get("ALBUM"),
+                            metadata.get("ALBUMARTIST"),
+                            metadata.get("ALBUMSORT"),
+                            metadata.get("ARTIST"),
+                            metadata.get("ARTISTSORT"),
+                            metadata.get("COMPILATION"),
+                            metadata.get("COPYRIGHT"),
+                            metadata.get("DISCNUMBER"),
+                            metadata.get("GENRE"),
+                            metadata.get("ITUNESADVISORY"),
+                            metadata.get("ITUNESALBUMID"),
+                            metadata.get("ITUNESARTISTID"),
+                            metadata.get("ITUNESCATALOGID"),
+                            metadata.get("ITUNESGENREID"),
+                            metadata.get("ITUNESGAPLESS"),
+                            metadata.get("ITUNESMEDIATYPE"),
+                            metadata.get("TITLE"),
+                            metadata.get("TITLESORT"),
+                            metadata.get("TOTALTRACKS"),
+                            metadata.get("TRACK"),
+                            metadata.get("YEAR")
+                        )
+                        processed += 1
+                        break
+
+                prefix += 1
+
+                if processed == int(metadata.get("TOTALTRACKS")):
+                    delete_others = True
+                    break
+
+                if delete_others:
+                    for filename in os.listdir(matched_folder):
+                        if filename.startswith(str(prefix)):
+                            file_path = os.path.join(matched_folder, filename)
+                            try:
+                                os.remove(file_path)
+                                print(f"Deleted leftover mp3: {filename}")
+                            except Exception as e:
+                                print(f"Failed to delete {filename}: {e}")
+
+        else:
+
+            update_progress(task_id, "Downloading single track...", 30)
+            song = songs[0].find_element(By.CSS_SELECTOR, '.yt-simple-endpoint.style-scope.ytd-video-renderer')
+            song_url = song.get_attribute('href')
+
+            print(f"Downloading song from: {song_url}")
+            title_folder = download_as_mp3(song_url, library_dir)
+            matched_folder = find_matching_folder(title_folder, library_dir)
+            update_progress(task_id, "Converting to M4A...", 60)
+            convert_all_mp3_to_m4a(matched_folder, delete_original=True)
+
+            update_progress(task_id, "Adding metadata...", 80)
+
+            metadata_filepath = None
+            metadata_filepath = find_best_metadata_file(title_folder, metadata_dir)
+
+            metadata = recover_metadata(metadata_filepath)
+            filename = os.listdir(matched_folder)[0]
+
+            artists = metadata.get("ARTISTS")
+            if artists is None:
+                artists_list = []
+            elif isinstance(artists, list):
+                artists_list = artists
+            else:
+                artists_list = [artists]
+
+            music_filepath = os.path.join(matched_folder, filename)
+            new_music_filepath = os.path.join(
+                matched_folder,
+                os.path.splitext(os.path.basename(metadata_filepath))[0] + os.path.splitext(music_filepath)[1]
+            )
+            if music_filepath != new_music_filepath:
+                os.rename(music_filepath, new_music_filepath)
+                music_filepath = new_music_filepath
+
+            add_metadata(
+                music_filepath,
+                os.path.join(metadata_dir, 'artwork.jpg'),
+                artists_list,
+                metadata.get("ALBUM"),
+                metadata.get("ALBUMARTIST"),
+                metadata.get("ALBUMSORT"),
+                metadata.get("ARTIST"),
+                metadata.get("ARTISTSORT"),
+                metadata.get("COMPILATION"),
+                metadata.get("COPYRIGHT"),
+                metadata.get("DISCNUMBER"),
+                metadata.get("GENRE"),
+                metadata.get("ITUNESADVISORY"),
+                metadata.get("ITUNESALBUMID"),
+                metadata.get("ITUNESARTISTID"),
+                metadata.get("ITUNESCATALOGID"),
+                metadata.get("ITUNESGENREID"),
+                metadata.get("ITUNESGAPLESS"),
+                metadata.get("ITUNESMEDIATYPE"),
+                metadata.get("TITLE"),
+                metadata.get("TITLESORT"),
+                metadata.get("TOTALTRACKS"),
+                metadata.get("TRACK"),
+                metadata.get("YEAR")
+            )
+
+        first_song = None
+        for f in os.listdir(matched_folder):
+            if f.lower().endswith(('.m4a')):
+                first_song = os.path.join(matched_folder, f)
+                break
+
+        if first_song:
+            audio = MP4(first_song)
+            album_tag = audio.tags.get('\xa9alb')
+            if album_tag and album_tag[0]:
+                album_name = album_tag[0]
+
+                safe_album_name = re.sub(r'[\\/:*?"<>|]', '', album_name).strip()
+                parent_dir = os.path.dirname(matched_folder)
+                new_folder_path = os.path.join(parent_dir, safe_album_name)
+                if not os.path.exists(new_folder_path):
+                    os.rename(matched_folder, new_folder_path)
+                    print(f"Renamed folder to: {safe_album_name}")
+                else:
+                    print(f"Folder '{safe_album_name}' already exists, not renamed.")
+
+        
+        update_progress(task_id, "Cleaning up...", 95)
+        cleanup_metadata_dir(metadata_dir)
+
+        driver.quit()
+        update_progress(task_id, "Download completed", 100)
+
+        time.sleep(30)
+        if task_id in download_progress:
+            del download_progress[task_id]
+
+    except Exception as e:
+        update_progress(task_id, f'Error: {str(e)}', -1)
+
+@app.route('/progress/<task_id>')
+def progress(task_id):
+
+    progress = download_progress.get(task_id, {'message': 'Starting...', 'percentage': 0})
+    return {
+        'message': progress['message'],
+        'percentage': progress['percentage']
+    }
+
 @app.route('/', methods=['GET', 'POST'])
 def home():
 
     form = SearchForm()
     confirm_form = ConfirmForm()
 
-    if request.method == 'GET' and not request.args.get('from_redirect'):
+    if request.method == 'GET':
+        if request.args.get('download') == 'success':
+            flash('Download completed successfully')
 
-        session.pop('title', None)
-        session.pop('artist', None)
-        session.pop('current_search', None)
-        session.pop('currentid', None)
-        print("GET request - session cleared")
+        if not request.args.get('from_redirect'):
+            session.pop('title', None)
+            session.pop('artist', None)
+            session.pop('current_search', None)
+            session.pop('currentid', None)
+            session.pop('current_task', None)
+            print("GET request - session cleared")
 
     if request.method == 'POST':
         
@@ -360,11 +623,16 @@ def home():
                 if not current_search:
                     flash('No search data found. Please search again.')
                     return render_template('home.html', form=form, confirm_form=confirm_form, active_page='Home')
-                
-                flash('Download started!')
-                print("YES button clicked - download logic goes here")
-                return redirect('/')
-                
+
+                task_id = str(uuid.uuid4())
+                session['current_task'] = task_id
+
+                thread = threading.Thread(target=download_with_progress, args=(current_search, task_id))
+                thread.daemon = True
+                thread.start()
+
+                return render_template('progress.html', active_page='Home', task_id=task_id)
+
             elif 'no' in request.form:
 
                 currentid = session.get('currentid', 0)
@@ -379,7 +647,6 @@ def home():
                     flash('Search session expired. Please search again.')
                     return render_template('home.html', form=form, confirm_form=confirm_form, active_page='Home')
                 
-                print(f"NO button clicked - showing result {nextid}")
                 return show_search_results(form, confirm_form, title, artist, nextid)
         
         elif form.validate_on_submit():
@@ -387,8 +654,8 @@ def home():
             title = form.album.data
             artist = form.artist.data
                 
-            if not title.strip() and not artist.strip():
-                flash('Please enter an album or artist name to search.')
+            if not title.strip() or not artist.strip():
+                flash('Please enter an album & artist name to search. Both are required.')
                 return render_template('home.html', form=form, confirm_form=confirm_form, active_page='Home')
                 
             session['title'] = title
@@ -408,4 +675,4 @@ def settings():
     return render_template('settings.html', active_page='Settings')
 
 if __name__ == '__main__':
-    app.run(debug=True)  # Add debug=True for easier testing
+    app.run(debug=True)

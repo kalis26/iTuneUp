@@ -313,7 +313,7 @@ while not found:
 
 if not abort:
 
-    title, artist = ExtractMetadata(driver, id, metadata_dir)
+    title, artist = ExtractMetadata(urlApple, id, metadata_dir)
 
     title_query = title.replace(' ', '+').replace("'", '%27')
     artist_query = artist.replace(' ', '+').replace("'", '%27')

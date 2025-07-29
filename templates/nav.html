@@ -42,6 +42,31 @@
 
     </div>
 
+    {% with messages = get_flashed_messages() %}
+
+        {% if messages %}
+
+            <div class="flash-overlay" id="flashOverlay">
+                <div class="flash-bubble">
+                    <div class="flash-content">
+                            
+                        {% for message in messages %}
+
+                            <p class="flash-message">{{ message }}</p>
+
+                        {% endfor %}
+
+                        <div class="flash-button-container">
+                            <button class="flash-button" onclick="closeFlash()">OK</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+        {% endif %}
+            
+    {% endwith %}
+
     {% block scripts %}
     
     {% endblock %}

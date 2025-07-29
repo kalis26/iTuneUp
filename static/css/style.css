@@ -363,3 +363,206 @@ form{
     background-color: #F7F7F7;
     color: black;
 }
+
+.flash-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(0, 0, 0, 0.1);
+    backdrop-filter: blur(2px);
+    -webkit-backdrop-filter: blur(2px);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    z-index: 1000;
+    animation: fadeIn 0.3s ease-out;
+}
+
+.flash-bubble {
+    background: rgba(255, 255, 255, 0.95);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    border-radius: 20px;
+    padding: 30px 40px;
+    box-shadow: 0 10px 40px rgba(0, 0, 0, 0.2);
+    border: 1px solid rgba(255, 255, 255, 0.3);
+    max-width: 400px;
+    min-width: 300px;
+    text-align: center;
+    transform: scale(0.9);
+    animation: popIn 0.3s ease-out forwards;
+    filter: none !important;
+}
+
+.flash-content {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 20px;
+}
+
+.flash-message {
+    font-family: 'SF PRO Regular', -apple-system, BlinkMacSystemFont, sans-serif;
+    font-size: 16px;
+    color: #333;
+    margin: 0;
+    line-height: 1.4;
+    text-align: center;
+}
+
+.flash-button-container {
+    border-radius: 30px;
+    background: linear-gradient(90deg, #0091FF, #00ffea);
+    transition: background 0.2s ease;
+    width: fit-content;
+    padding: 0.5px;
+}
+
+.flash-button {
+    background: #0091FF;
+    color: white;
+    border: none;
+    border-radius: 25px;
+    padding: 12px 30px;
+    font-family: 'SF PRO Regular', -apple-system, BlinkMacSystemFont, sans-serif;
+    font-size: 16px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    min-width: 80px;
+}
+
+body.flash-active > *:not(.flash-overlay) {
+    filter: blur(2px);
+    transition: filter 0.3s ease;
+}
+
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+    }
+    to {
+        opacity: 1;
+    }
+}
+
+@keyframes popIn {
+    from {
+        transform: scale(0.8);
+        opacity: 0;
+    }
+    to {
+        transform: scale(1);
+        opacity: 1;
+    }
+}
+
+.flash-overlay.fade-out {
+    animation: fadeOut 0.2s ease-in forwards;
+}
+
+.flash-bubble.fade-out {
+    animation: popOut 0.2s ease-in forwards;
+}
+
+@keyframes fadeOut {
+    from {
+        opacity: 1;
+    }
+    to {
+        opacity: 0;
+    }
+}
+
+@keyframes popOut {
+    from {
+        transform: scale(1);
+        opacity: 1;
+    }
+    to {
+        transform: scale(0.9);
+        opacity: 0;
+    }
+}
+
+.content.blur {
+    filter: blur(1px);
+    transition: filter 0.3s ease;
+}
+
+.progress-container {
+    max-width: 600px;
+    margin: 50px auto;
+    padding: 40px;
+    text-align: center;
+}
+
+.progress-title {
+    font-size: 50px;
+    text-shadow: 0 2px 2px rgba(0, 0, 0, 0.1);
+}
+
+.progress-wrapper {
+    margin: 40px 0;
+}
+
+.progress-bar-container {
+    position: relative;
+    margin-bottom: 20px;
+}
+
+.progress-bar {
+    width: 100%;
+    height: 8px;
+    background-color: rgb(120, 120, 120, 0.2);
+    border-radius: 4px;
+    overflow: hidden;
+    position: relative;
+}
+
+.progress-fill {
+    height: 100%;
+    background: #08F;
+    border-radius: 4px;
+    transition: width 0.5s ease;
+    width: 0%;
+}
+
+.progress-text {
+    display: none;
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    font-family: 'SF PRO Regular';
+    font-size: 14px;
+    font-weight: bold;
+    color: #333;
+}
+
+.progress-message {
+    font-family: 'SF PRO Regular';
+    font-size: 16px;
+    color: #666;
+    margin-top: 15px;
+    min-height: 20px;
+}
+
+.cancel-button, .return-button {
+    background: #ff3b30;
+    color: white;
+    border: none;
+    border-radius: 12px;
+    padding: 12px 30px;
+    font-family: 'SF PRO Regular';
+    font-size: 16px;
+    cursor: pointer;
+    margin-top: 30px;
+    transition: all 0.2s ease;
+}
+
+.cancel-button:hover {
+    background: #e53935;
+}
