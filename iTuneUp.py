@@ -136,7 +136,6 @@ def add_metadata(file_path, image_path, artists, album, albumartist, albumsort, 
 
     audio.save()
 
-    print("Written compilation tag:", audio.tags.get("cpil"))
 
 def recover_metadata(file_path):
     metadata = {}

@@ -16,7 +16,7 @@
                     Home
                 </a>
             </li>
-            <li class="{% if active_page == 'Search' %}active{% endif %}">
+            <li class="{% if active_page == 'Library' %}active{% endif %}">
                 <a href="{{ url_for('library') }}">
                     <img src="{{ url_for('static', filename='images/library.png') }}">
                     Library
@@ -35,14 +35,16 @@
         </div>
     </nav>
     <div class="content">
+
         {% block content %}
 
         {% endblock %}
+
     </div>
 
     {% block scripts %}
     
     {% endblock %}
-    
+
 </body>
 </html>
