@@ -1,5 +1,187 @@
 {% extends 'nav.html' %}
 
+{% block title %}Library - iTuneUp{% endblock %}
+
 {% block content %}
+
+    <div class="library-container" data-albums="{{ albums|tojson|e }}" id="libraryContainer">
+
+        {% if albums %}
+
+            <div class="albums-grid" id="albumsGrid">
+                {% for album in albums %}
+                    <div class="album-box" data-album-index="{{ loop.index0 }}" onclick="toggleAlbumDetails('{{ loop.index0 }}')">
+                        <div class="album-cover">
+                            <img src="{{ url_for('album_cover', album_folder=album.folder_name) }}" 
+                                 alt="{{ album.album }}" 
+                                 onerror="this.src='/static/images/default-cover.png'">
+                        </div>
+                        <div class="album-info">
+                            <p class="album-title">{{ album.album }}</p>
+                            <p class="album-artist">{{ album.artist }}</p>
+                        </div>
+                    </div>
+                {% endfor %}
+            </div>
+
+            <div class="album-details" id="albumDetails">
+                <div class="details-content">
+                    <button class="close-details" onclick="closeAlbumDetails()">×</button>
+                    <div class="details-info">
+                        <img class="details-cover" id="detailsCover" src="" alt="">
+                            <div class="details-text">
+                                <h2 id="detailsAlbum">Album Name</h2>
+                                <p id="detailsArtist">Artist Name</p>
+                                <div class="details-meta">
+                                    <span id="detailsYear">Year</span> •
+                                    <span id="detailsGenre">Genre</span> •
+                                    <span id="detailsTracks">0 tracks</span>
+                                </div>
+                            </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="pagination-controls">
+                <button class="page-btn" id="prevBtn" onclick="changePage(-1)">‹ Previous</button>
+                    <span class="page-info">
+                        Page <span id="currentPage">1</span> of <span id="totalPages">1</span>
+                    </span>
+                <button class="page-btn" id="nextBtn" onclick="changePage(1)">Next ›</button>
+            </div>
+
+        {% else %}
+
+            <div class="empty-library">
+                <div class="empty-img">
+                    <img src="{{ url_for('static', filename='images/default-cover.png') }}" alt="Empty Library" class="empty-cover">
+                </div>
+                <h2>Your library is empty</h2>
+                <p>Start by searching and downloading your favorite albums</p>
+                <div class="start-searching-btn-container">
+                    <a href="{{ url_for('home') }}" class="start-searching-btn">Start Searching</a>
+                </div>         
+            </div>
+            
+        {% endif %}
+
+    </div>
+
+<script type="application/json" id="albums-data">{{ albums|tojson }}</script>
+
+{% endblock %}
+
+{% block scripts %}
+
+<script src="{{ url_for('static', filename='js/main.js') }}"></script>
+<script>  
+
+
+let albums = [];
+let albumsPerPage = 8;
+let currentPage = 1;
+let totalPages = 1;
+
+function updatePagination() {
+
+    const currentPageEl = document.getElementById('currentPage');
+    const totalPagesEl = document.getElementById('totalPages');
+    const prevBtn = document.getElementById('prevBtn');
+    const nextBtn = document.getElementById('nextBtn');
+
+    if (!currentPageEl || !totalPagesEl || !prevBtn || !nextBtn) {
+        return;
+    };
+
+    currentPageEl.textContent = currentPage;
+    totalPagesEl.textContent = totalPages;
+
+    prevBtn.disabled = currentPage === 1;
+    nextBtn.disabled = currentPage === totalPages;
+
+    const albumBoxes = document.querySelectorAll('.album-box');
+    albumBoxes.forEach((box, index) => {
+        const startIndex = (currentPage - 1) * albumsPerPage;
+        const endIndex = startIndex + albumsPerPage;
+        
+        if (index >= startIndex && index < endIndex) {
+            box.style.display = 'block';
+        } else {
+            box.style.display = 'none';
+        }
+    });
+}
+
+function changePage(direction) {
+    const newPage = currentPage + direction;
+    if (newPage >= 1 && newPage <= totalPages) {
+        currentPage = newPage;
+        updatePagination();
+        closeAlbumDetails();
+    }
+}
+
+function toggleAlbumDetails(albumIndex) {
+
+    if (!albums || albums.length === 0) {
+        console.error('Albums array not initialized');
+        return;
+    }
+
+    const index = parseInt(albumIndex);
+    const album = albums[index];
+
+    if (!album) {
+        console.error('Album not found at index:', index);
+        return;
+    }
+
+    const detailsDiv = document.getElementById('albumDetails');
+    if (!detailsDiv) {
+        console.error('Details div not found');
+        return;
+    }
+
+    const detailsCover = document.getElementById('detailsCover');
+    const detailsAlbum = document.getElementById('detailsAlbum');
+    const detailsArtist = document.getElementById('detailsArtist');
+    const detailsYear = document.getElementById('detailsYear');
+    const detailsGenre = document.getElementById('detailsGenre');
+    const detailsTracks = document.getElementById('detailsTracks');
+
+    if (detailsCover) detailsCover.src = `/album_cover/${album.folder_name}`;
+    if (detailsAlbum) detailsAlbum.textContent = album.album;
+    if (detailsArtist) detailsArtist.textContent = album.artist;
+    if (detailsYear) detailsYear.textContent = album.year;
+    if (detailsGenre) detailsGenre.textContent = album.genre;
+    if (detailsTracks) detailsTracks.textContent = `${album.track_count} tracks`;
+    
+    detailsDiv.classList.add('active');
+    
+    const albumBoxes = document.querySelectorAll('.album-box');
+    albumBoxes.forEach((box, boxIndex) => {
+        const startIndex = (currentPage - 1) * albumsPerPage;
+        if (boxIndex >= startIndex && boxIndex < startIndex + 4) {
+            box.style.display = 'block';
+        } else {
+            box.style.display = 'none';
+        }
+    });
+}
+
+function closeAlbumDetails() {
+    const detailsDiv = document.getElementById('albumDetails');
+    if (detailsDiv) {
+        detailsDiv.classList.remove('active');
+        updatePagination();
+    }
+}
+
+if (albums && albums.length > 0) {
+    updatePagination();
+}
+
+</script>
+
 
 {% endblock %}

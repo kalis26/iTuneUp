@@ -8,7 +8,7 @@
     <h3>Search for your desired song or album</h3>
     
     <div class="form-container">
-        <form action="" method="post">
+        <form action="" method="post" novalidate>
             {{ form.hidden_tag() }}
             <p>
                 <div class="input-container" id="top-container">
@@ -42,7 +42,7 @@
                 <p>
                     <div class="search-result-container">
                         <div class="search-result">
-                            <p>Did you search for:</p>
+                            <p>Did you search for</p>
                             <div class="search-result-info">
                                 <img src="{{ IMG }}" alt="Search Result Image" class="search-result-img">
                                 <div class="text-container">
@@ -55,7 +55,7 @@
                 </p>
 
                 <!-- Show Yes/No buttons -->
-                <form action="" method="post" class="confirm-form">
+                <form action="" method="post" class="confirm-form" novalidate>
                     {{ confirm_form.hidden_tag() }}
                     <p>
                         <div class="confirm-buttons-container">

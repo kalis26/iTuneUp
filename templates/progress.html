@@ -22,9 +22,45 @@
 
 {% block scripts %}
 
-<script>
-    const taskID = '{{ task_id }}';
-</script>
 <script src="{{ url_for('static', filename='js/main.js') }}"></script>
+<script>
+
+const taskID = '{{ task_id }}';
+let progressInterval;
+
+function updateProgress() {
+
+    fetch(`/progress/${taskID}`)
+        .then(response => response.json())
+        .then(data => {
+            const percentage = data.percentage;
+            const message = data.message;
+
+            document.getElementById('progressFill').style.width = percentage + '%';
+            document.getElementById('progressText').textContent = percentage + '%';
+            document.getElementById('progressMessage').textContent = message;
+            
+            if (percentage >= 100) {
+                clearInterval(progressInterval);
+
+                setTimeout(() => {
+                    window.location.href = '/?download=success';
+                }, 2000);
+            } else if (percentage < 0) {
+                clearInterval(progressInterval);
+                document.getElementById('progressMessage').textContent = 'Download failed: ' + message;
+                document.getElementById('progressFill').style.backgroundColor = '#ff3b30';
+            }     
+        })
+        .catch(error => {
+            console.error('Error fetching progress:', error);
+        });
+
+}
+
+progressInterval = setInterval(updateProgress, 1000);
+updateProgress();
+
+</script>
 
 {% endblock %}
