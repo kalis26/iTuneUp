@@ -66,7 +66,7 @@
     background-color: #F7F7F7;
 }
 
-.side-nav img{
+.nav-links img{
     margin-right: 15px;
     margin-left: 15px;
     width: 24px;
@@ -85,11 +85,24 @@
     background-color: #F7F7F7;
 }
 
-.side-nav h3{
-    font-family: 'SF PRO Bold';
+.logo-container {
+    display: flex;
+    align-items: center;
     margin-left: 40px;
     margin-top: 30px;
     margin-bottom: 20px;
+    gap: 10px;
+}
+
+.logo {
+    height: 28px;
+    width: 28px;
+    margin: 0;
+}
+
+.side-nav h3{
+    font-family: 'SF PRO Bold';
+    margin: 0;
 }
 
 .footer{
@@ -882,8 +895,14 @@ body.flash-active > *:not(.flash-overlay) {
 }
 
 .empty-library {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
     text-align: center;
     padding: 50px 20px;
+    flex: 1;
+    height: 100%;
 }
 
 .empty-icon {

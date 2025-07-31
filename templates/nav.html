@@ -8,8 +8,11 @@
 </head>
 <body>
     <nav class="side-nav">
-        <h3>iTuneUp</h3>
-        <ul>
+        <div class="logo-container">
+            <img src="{{ url_for('static', filename='images/logo.png') }}" alt="iTuneUp Logo" class="logo">
+            <h3>iTuneUp</h3>
+        </div>
+        <ul class="nav-links">
             <li class="{% if active_page == 'Home' %}active{% endif %}">
                 <a href="{{ url_for('home') }}">
                     <img src="{{ url_for('static', filename='images/home.png') }}">
