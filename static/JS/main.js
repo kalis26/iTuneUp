@@ -72,24 +72,6 @@ document.addEventListener('mousemove', (e) => {
         startSearchbtn.style.background = `linear-gradient(${stsAngle}deg, #0091FF, #00ffea)`;
     }
 
-    if (libraryContainer && libraryContainer.dataset.albums) {
-        try {
-            const albumsScript = document.getElementById('albums-data');
-            if (albumsScript) {
-                albums = JSON.parse(albumsScript.textContent);
-                console.log('Albums loaded:', albums.length);
-                
-                if (albums.length > 0) {
-                    totalPages = Math.ceil(albums.length / albumsPerPage);
-                    updatePagination();
-                }
-            }
-        } catch (error) {
-            console.error('Error parsing albums data:', error);
-            console.log('Script content:', document.getElementById('albums-data')?.textContent);
-        }
-    }
-
 });
 
 function closeFlash() {
@@ -156,6 +138,30 @@ document.addEventListener('DOMContentLoaded', function() {
 
     if (flashOverlay) { 
         document.body.classList.add('flash-active');
+    }
+
+    if (libraryContainer && libraryContainer.dataset.albums) {
+        try {
+            const albumsScript = document.getElementById('albums-data');
+            if (albumsScript) {
+                albums = JSON.parse(albumsScript.textContent);
+                console.log('Albums loaded:', albums.length);
+                
+                if (albums.length > 0) {
+                    totalPages = Math.ceil(albums.length / albumsPerPage);
+                    console.log('Total pages:', totalPages);
+                    generatePageDots();
+                    updatePagination();
+                } else {
+                    console.log('No albums found');
+                }
+            } else {
+                console.log('Albums script element not found');
+            }
+        } catch (error) {
+            console.error('Error parsing albums data:', error);
+            console.log('Script content:', document.getElementById('albums-data')?.textContent);
+        }
     }
 
 });

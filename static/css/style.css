@@ -1,7 +1,21 @@
 @font-face {
+    font-family: 'SF PRO Light';
+    src: url(../fonts/SF-Pro-Display-Light.otf) format(opentype);
+    font-weight: 300;
+    font-style: normal;
+}
+
+@font-face {
     font-family: 'SF PRO Regular';
     src: url(../fonts/SF-Pro-Display-Regular.otf) format(opentype);
     font-weight: 400;
+    font-style: normal;
+}
+
+@font-face {
+    font-family: 'SF PRO Medium';
+    src: url(../fonts/SF-Pro-Display-Medium.otf) format(opentype);
+    font-weight: 500;
     font-style: normal;
 }
 
@@ -575,9 +589,43 @@ body.flash-active > *:not(.flash-overlay) {
 }
 
 .library-container {
+    height: 100%;
     padding: 20px;
     max-width: 1200px;
     margin: 0 auto;
+    display: flex;
+    flex-direction: column;
+}
+
+.library-content {
+    flex: 1;
+    overflow-y: auto;
+    overflow-x: hidden;
+    scrollbar-width: thin;
+    scrollbar-color: rgba(0, 0, 0, 0.2) transparent;
+    margin: 0 -20px;
+}
+
+.library-content::-webkit-scrollbar {
+    width: 4px;
+}
+
+.library-content::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+.library-content::-webkit-scrollbar-thumb {
+    background: rgba(0, 0, 0, 0.2);
+    border-radius: 2px;
+    transition: background 0.3s ease;
+}
+
+.library-content::-webkit-scrollbar-thumb:hover {
+    background: rgba(0, 0, 0, 0.4);
+}
+
+.library-content::-webkit-scrollbar-thumb:active {
+    background: rgba(0, 0, 0, 0.6);
 }
 
 .pagination-controls {
@@ -585,30 +633,87 @@ body.flash-active > *:not(.flash-overlay) {
     justify-content: center;
     align-items: center;
     margin: 20px 0;
-    gap: 20px;
+    gap: 30px;
+    padding: 20px 0;
+    border-top: 1px solid #E0E0E0;
+    background: rgba(255, 255, 255, 0.8);
+    backdrop-filter: blur(20px);
+    position: sticky;
+    bottom: 0;
 }
 
 .page-btn {
-    background: #007AFF;
-    color: white;
+    background: rgba(0, 122, 255, 0.1);
+    color: #007AFF;
     border: none;
-    border-radius: 8px;
-    padding: 10px 20px;
-    font-family: 'SF PRO Regular';
-    font-size: 14px;
+    border-radius: 50%;
+    width: 40px;
+    height: 40px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
     cursor: pointer;
-    transition: all 0.2s ease;
+    transition: all 0.3s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+    backdrop-filter: blur(10px);
 }
 
 .page-btn:hover:not(:disabled) {
-    background: #0056CC;
-    transform: translateY(-1px);
+    background: rgba(0, 122, 255, 0.2);
+    transform: scale(1.05);
+}
+
+.page-btn:active:not(:disabled) {
+    transform: scale(0.95);
 }
 
 .page-btn:disabled {
-    background: #ccc;
+    background: rgba(0, 0, 0, 0.05);
+    color: rgba(0, 0, 0, 0.3);
     cursor: not-allowed;
     transform: none;
+}
+
+.page-dots {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 0 10px;
+}
+
+.page-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: #D1D1D6;
+    cursor: pointer;
+    transition: all 0.3s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+    position: relative;
+}
+
+.page-dot:hover {
+    background: #AEAEB2;
+    transform: scale(1.1);
+}
+
+.page-dot.active {
+    width: 10px;
+    height: 10px;
+    background: #666666;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+}
+
+.page-dot.active:hover {
+    background: #555555;
+}
+
+@keyframes dotZoom {
+    0% { transform: scale(1); }
+    50% { transform: scale(1.2); }
+    100% { transform: scale(1); }
+}
+
+.page-dot.changing {
+    animation: dotZoom 0.4s cubic-bezier(0.25, 0.46, 0.45, 0.94);
 }
 
 .page-info {
@@ -619,109 +724,161 @@ body.flash-active > *:not(.flash-overlay) {
 
 .albums-grid {
     display: grid;
-    grid-template-columns: repeat(4, 1fr);
+    grid-template-columns: repeat(5, 1fr);
     gap: 30px;
-    margin: 30px 0;
+    margin: 10px 0;
+    padding: 20px;
 }
 
 .album-box {
-    width: 240px;
-    height: 240px;
-    background: #f9f9f9;
+    background: rgba(255, 255, 255, 0.8);
+    backdrop-filter: blur(20px);
     border-radius: 30px;
-    overflow: hidden;
+    text-align: center;
     cursor: pointer;
-    transition: all 0.3s ease;
-    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
+    transition: all 0.3s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+    box-shadow: 0 4px 4px rgba(0, 0, 0, 0.1);
+    overflow: hidden;
 }
 
 .album-box:hover {
     transform: translateY(-5px);
-    box-shadow: 0 8px 30px rgba(0, 0, 0, 0.2);
+    box-shadow: 0 10px 20px rgba(0, 0, 0, 0.15);
 }
 
 .album-cover {
     width: 100%;
+    height: 100%;
     overflow: hidden;
+    border-radius: 20px;
 }
 
 .album-cover img {
     width: 100%;
     height: 100%;
     object-fit: cover;
+    border-radius: 20px;
 }
 
-
 .album-details {
+    grid-column: 1 / -1;
     width: 100%;
-    background: rgba(255, 255, 255, 0.95);
-    backdrop-filter: blur(20px);
-    border-radius: 20px;
+    background: linear-gradient(135deg, rgba(255, 255, 255, 0.95), rgba(248, 248, 248, 0.95));
+    backdrop-filter: blur(30px);
+    border-radius: 25px;
     margin: 20px 0;
     max-height: 0;
     overflow: hidden;
-    transition: all 0.5s ease;
-    box-shadow: 0 10px 40px rgba(0, 0, 0, 0.1);
+    transition: all 0.6s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+    box-shadow: 0 8px 10px rgba(0, 0, 0, 0.1);
+    border: 1px solid rgba(255, 255, 255, 0.3);
+    opacity: 0;
+    transform: translateY(-20px);
 }
 
 .album-details.active {
-    max-height: 300px;
+    max-height: 700px;
     padding: 30px;
+    opacity: 1;
+    transform: translateY(0);
 }
 
 .details-content {
     position: relative;
+    height: 100%;
+    min-height: 400px;
+    display: flex;
 }
 
 .close-details {
     position: absolute;
     top: -10px;
     right: -10px;
-    background: #ff3b30;
-    color: white;
+    background: rgba(0, 0, 0, 0.1);
     border: none;
     border-radius: 50%;
-    width: 30px;
-    height: 30px;
-    font-size: 18px;
-    cursor: pointer;
+    width: 35px;
+    height: 35px;
     display: flex;
     align-items: center;
     justify-content: center;
+    cursor: pointer;
+    font-size: 20px;
+    color: #666;
+    transition: all 0.3s ease;
+    backdrop-filter: blur(10px);
+    z-index: 10;
+}
+
+.close-details:hover {
+    background: rgba(255, 59, 48, 0.2);
+    color: #ff3b30;
+    transform: scale(1.1);
 }
 
 .details-info {
     display: flex;
-    align-items: center;
     gap: 30px;
+    align-items: flex-start;
+    height: 100%;
+    flex: 1;
+    height: 100%;
+    position: relative;
 }
 
-.details-cover {
-    width: 120px;
-    height: 120px;
-    border-radius: 15px;
-    object-fit: cover;
-    flex-shrink: 0;
+.details-text {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+    position: relative;
 }
 
 .details-text h2 {
-    font-family: 'SF PRO Regular';
+    font-family: 'SF PRO Bold';
     font-size: 32px;
-    margin: 0 0 10px 0;
-    color: #333;
+    color: #000000;
+    padding-left: 10px;
+    margin: 0;
+    margin-bottom: 5px;
 }
 
-.details-text p {
-    font-family: 'SF PRO Regular';
-    font-size: 20px;
-    color: #666;
-    margin: 0 0 15px 0;
+.detailsBA {
+    padding-left: 40px;
+    margin-bottom: 5px;
+}
+
+#detailsBy {
+    font-family: 'SF PRO Light';
+    font-size: 28px;
+    color: #000000;
+}
+
+#detailsArtist {
+    font-family: 'SF PRO Medium';
+    font-size: 28px;
+    color: #000000;
+}
+
+.detailsYSG {
+    font-family: 'SF PRO Medium';
+    font-size: 18px;
+    color: #000000;
+    padding-left: 10px;
 }
 
 .details-meta {
     font-family: 'SF PRO Regular';
-    font-size: 16px;
-    color: #999;
+    font-size: 14px;
+    color: #7E7D7D;
+    display: block;
+    position: absolute;
+    bottom: 0;
+    padding-left: 10px;
+}
+
+.details-meta p {
+    margin: 0;
 }
 
 .empty-library {
@@ -786,32 +943,167 @@ body.flash-active > *:not(.flash-overlay) {
 }
 
 @media (max-width: 1024px) {
+
     .albums-grid {
         grid-template-columns: repeat(3, 1fr);
+        padding: 15px;
+    }
+
+    .library-content {
+        margin: 0 -15px;
     }
     
     .album-box {
         width: 200px;
-        height: 260px;
+        height: 200px;
     }
     
     .album-cover {
         height: 200px;
     }
+
+    .details-text h2 {
+        font-size: 24px;
+    }
+    
+    .details-text p {
+        font-size: 18px;
+    }
+
+    .pagination-controls {
+        gap: 20px;
+    }
+    
+    .page-dots {
+        gap: 6px;
+    }
 }
 
 @media (max-width: 768px) {
+
     .albums-grid {
         grid-template-columns: repeat(2, 1fr);
         gap: 20px;
+        padding: 10px;
+    }
+
+    .library-content {
+        margin: 0 -10px;
     }
     
     .album-box {
         width: 180px;
-        height: 240px;
+        height: 180px;
     }
     
     .album-cover {
         height: 180px;
     }
+
+    .page-btn {
+        width: 36px;
+        height: 36px;
+    }
+    
+    .page-dot {
+        width: 5px;
+        height: 5px;
+    }
+    
+    .page-dot.active {
+        width: 16px;
+        height: 5px;
+    }
+
+    .details-info {
+        flex-direction: column;
+        text-align: center;
+        gap: 20px;
+    }
+    
+    .details-text h2 {
+        font-size: 20px;
+    }
+    
+    .details-text p {
+        font-size: 16px;
+    }
+    
+    .details-meta {
+        justify-content: center;
+        gap: 10px;
+        font-size: 14px;
+    }
+}
+
+.details-tracks {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    margin-left: 30px;
+    max-height: 100%;
+    overflow-y: auto;
+    position: relative;
+    padding: 20px 20px 20px 20px;
+    background-color: #F5F5F5;
+    border-radius: 20px;
+    box-shadow: 2px 4px 8px rgba(0, 0, 0, 0.1);
+}
+
+#detailsTrackList {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+    max-height: 500px;
+    padding: 20px 20px 20px 20px;
+    overflow-y: auto;
+    scrollbar-width: thin;
+    scrollbar-color: rgba(0, 0, 0, 0.2) transparent;
+}
+
+#detailsTrackList::-webkit-scrollbar {
+    width: 4px;
+}
+
+#detailsTrackList::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+#detailsTrackList::-webkit-scrollbar-thumb {
+    background: rgba(0, 0, 0, 0.2);
+    border-radius: 2px;
+}
+
+.track-item {
+    display: flex;
+    align-items: center;
+    padding: 8px 12px;
+    border-radius: 8px;
+    margin-bottom: 2px;
+    transition: background-color 0.2s ease;
+    cursor: pointer;
+    border-bottom: 1px solid #E6E6E6;
+}
+
+.track-item:hover {
+    background-color: rgba(0, 0, 0, 0.05);
+}
+
+.track-number {
+    font-family: 'SF PRO Medium';
+    font-size: 14px;
+    color: #8E8E93;
+    min-width: 25px;
+    text-align: center;
+    margin-right: 12px;
+}
+
+.track-title {
+    font-family: 'SF PRO Regular';
+    font-size: 14px;
+    color: #000000;
+    flex: 1;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
 }

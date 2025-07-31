@@ -291,7 +291,7 @@ def ExtractMetadata(driver, id, metadata_dir):
                 for artists in ARTISTS:
                     print('ARTISTS         | ', artists, file=f)
             print('COMPILATION     | ', COMPILATION, file=f)
-            print('COPYRIGTH       | ', COPYRIGHT, file=f)
+            print('COPYRIGHT       | ', COPYRIGHT, file=f)
             print('DISCNUMBER      | ', DISCNUMBER, file=f)
             print('GENRE           | ', GENRE, file=f)
             print("ITUNESADVISORY  | ", ITUNESADVISORY, file=f)

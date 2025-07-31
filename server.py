@@ -744,6 +744,28 @@ def download_with_progress(current_search, task_id):
     except Exception as e:
         update_progress(task_id, f'Error: {str(e)}', -1)
 
+def calculate_album_duration(folder_path):
+
+    total_duration = 0.0
+
+    for filename in os.listdir(folder_path):
+        if filename.lower().endswith(('.m4a')):
+            file_path = os.path.join(folder_path, filename)
+            try:
+                audio = MP4(file_path)
+                duration = audio.info.length
+                total_duration += duration
+                track_count += 1
+            except Exception as e:
+                print(f"Error reading {file_path}: {e}")
+
+    if total_duration > 0:
+        total_duration = int(total_duration / 60)
+    else:
+        total_duration = 0
+
+    return total_duration
+
 def scan_library():
 
     app_dir = os.path.dirname(os.path.abspath(__file__))
@@ -758,12 +780,16 @@ def scan_library():
     for folder in os.listdir(library_dir):
         folder_path = os.path.join(library_dir, folder)
         if os.path.isdir(folder_path):
-            
+
+            total_duration = calculate_album_duration(folder_path)
+
             album_info = None
             track_count = 0
+            track_list = []
 
             for filename in os.listdir(folder_path):
-                if filename.lower().endswith(('.m4a', '.mp3')):
+                if filename.lower().endswith(('.m4a')):
+                    track_list.append(filename.split('.m4a')[0])
                     track_count += 1
                     if album_info is None:
                         file_path = os.path.join(folder_path, filename)
@@ -782,8 +808,11 @@ def scan_library():
                                 'artist': clean_string(audio.tags.get('\xa9ART', ['Unknown Artist'])[0]),
                                 'year': clean_string(audio.tags.get('\xa9day', ['Unknown'])[0]),
                                 'genre': clean_string(audio.tags.get('\xa9gen', ['Unknown'])[0]),
+                                'copyright': clean_string(audio.tags.get('cprt', ['Unknown'])[0]),
                                 'track_count': 0,
                                 'total_tracks': audio.tags.get('trkn', [(0, 0)])[0][1] if audio.tags.get('trkn') else track_count,
+                                'duration': total_duration,
+                                'track_list': track_list
                             }
 
                         except Exception as e:
@@ -794,8 +823,11 @@ def scan_library():
                                 'artist': 'Unknown Artist',
                                 'year': 'Unknown',
                                 'genre': 'Unknown',
+                                'copyright': 'Unknown',
                                 'track_count': 0,
                                 'total_tracks': 0,
+                                'duration': 0.0,
+                                'track_list': []
                             }
 
             if album_info:
