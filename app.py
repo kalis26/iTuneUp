@@ -16,6 +16,8 @@ import threading
 import time
 import uuid
 import secrets
+import threading
+import webview
 
 app = Flask(__name__)
 app.config['SECRET_KEY'] = secrets.token_urlsafe(32)
@@ -253,9 +255,11 @@ def find_best_metadata_file(title_folder, metadata_dir):
             highest_ratio = ratio
             best_match = filename
 
-    if best_match and highest_ratio > 0.5:
+    if best_match and (highest_ratio > 0.5 or best_match is not None):
+        print(f"Selected best match: '{best_match}' with ratio: {highest_ratio:.2f}")
         return os.path.join(metadata_dir, best_match)
     else:
+        print("No suitable metadata file found")
         return None
     
 def cleanup_metadata_dir(metadata_dir):
@@ -816,5 +820,59 @@ def home():
 def settings():
     return render_template('settings.html', active_page='Settings')
 
+@app.route('/api/minimize')
+def api_minimize():
+    try:
+        import webview
+        webview.windows[0].minimize()
+        return {'status': 'success'}
+    except Exception as e:
+        return {'status': 'error', 'message': str(e)}
+
+window_maximized = False
+
+@app.route('/api/maximize')
+def api_maximize():
+    global window_maximized
+    try:
+        import webview
+        window = webview.windows[0]
+        
+        if window_maximized:
+            window.restore()
+            window_maximized = False
+        else:
+            window.maximize()
+            window_maximized = True
+            
+        return {'status': 'success', 'maximized': window_maximized}
+    except Exception as e:
+        return {'status': 'error', 'message': str(e)}
+    
+@app.route('/api/close')
+def api_close():
+    try:
+        import webview
+        webview.windows[0].destroy()
+        return {'status': 'success'}
+    except Exception as e:
+        return {'status': 'error', 'message': str(e)}
+
+def run_flask():
+    app.run(host='127.0.0.1', port=5000, debug=False)
+
 if __name__ == '__main__':
-    app.run()
+    
+    threading.Thread(target=run_flask, daemon=True).start()
+
+
+    window = webview.create_window(
+        "iTuneUp",
+        "http://127.0.0.1:5000",
+        width=1440,
+        height=820,
+        resizable=True,
+        frameless=True
+    )
+
+    webview.start(gui='edgechromium', debug=True)

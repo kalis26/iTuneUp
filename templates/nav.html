@@ -15,6 +15,95 @@
     <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
 </head>
 <body class="no-transition">
+
+    <script>
+
+        document.addEventListener('DOMContentLoaded', function() {
+            console.log('DOM loaded, checking for modal...');
+            const modal = document.getElementById('closeConfirmModal');
+            console.log('Modal found:', modal ? 'Yes' : 'No');
+        });
+
+        function minimizeWindow() {
+            console.log('Minimize button clicked');
+            fetch('/api/minimize')
+                .then(response => response.json())
+                .then(data => {
+                    console.log('Minimize response:', data);
+                })
+                .catch(error => {
+                    console.error('Minimize error:', error);
+                });
+        }
+
+        function maximizeWindow() {
+            console.log('Maximize button clicked');
+            fetch('/api/maximize')
+                .then(response => response.json())
+                .then(data => {
+                    console.log('Maximize response:', data);
+                })
+                .catch(error => {
+                    console.error('Maximize error:', error);
+                });
+        }
+
+        function closeWindow() {
+            console.log('Close button clicked');
+            const modal = document.getElementById('closeConfirmModal');
+            if (modal) {
+                console.log('Modal found, showing...');
+                modal.style.display = 'flex';
+            } else {
+                console.error('Modal not found! Falling back to confirm dialog');
+                if (confirm('Are you sure you want to close iTuneUp?')) {
+                    fetch('/api/close')
+                        .then(response => response.json())
+                        .then(data => {
+                            console.log('Close response:', data);
+                        })
+                        .catch(error => {
+                            console.error('Close error:', error);
+                        });
+                }
+            }
+        }
+
+        function hideCloseModal() {
+            console.log('Hiding modal');
+            const modal = document.getElementById('closeConfirmModal');
+            if (modal) {
+                modal.style.display = 'none';
+            }
+        }
+
+        function confirmClose() {
+            console.log('Close confirmed by user');
+            fetch('/api/close')
+                .then(response => response.json())
+                .then(data => {
+                    console.log('Close response:', data);
+                })
+                .catch(error => {
+                    console.error('Close error:', error);
+                });
+        }    
+
+    </script>
+
+    <div class="title-bar">
+        <div class="title-bar-buttons">
+            <button class="minimize-button" onclick="minimizeWindow()">
+                <img src="{{ url_for('static', filename='images/minimize.png') }}" alt="Minimize">
+            </button>
+            <button class="maximize-button" onclick="maximizeWindow()">
+                <img src="{{ url_for('static', filename='images/maximize.png') }}" alt="Maximize">
+            </button>
+            <button class="close-button" onclick="closeWindow()">
+                <img src="{{ url_for('static', filename='images/close.png') }}" alt="Close">
+            </button>
+        </div>
+    </div>
     <nav class="side-nav">
         <div class="logo-container">
             <img src="{{ url_for('static', filename='images/logo.png') }}" alt="iTuneUp Logo" class="logo">
@@ -74,12 +163,24 @@
                 </div>
             </div>
 
+
         {% endif %}
             
     {% endwith %}
 
+    <div id="closeConfirmModal" class="modal-overlay" style="display: none;">
+        <div class="modal-content">
+            <h3>Close iTuneUp</h3>
+                <p>Are you sure you want to close iTuneUp?</p>
+                <div class="modal-buttons">
+                    <button class="btn-cancel" onclick="hideCloseModal()">Cancel</button>
+                    <button class="btn-confirm" onclick="confirmClose()">Close</button>
+                </div>
+        </div>
+    </div>
+
     {% block scripts %}
-    
+
     {% endblock %}
 
 </body>

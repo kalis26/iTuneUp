@@ -88,6 +88,11 @@ body,
 }
 
 body {
+    margin: 0;
+    padding: 0;
+    padding-top: 30px;
+    height: 100vh;
+    overflow: hidden;
     background-color: var(--bg-primary);
     color: var(--text-primary);
 }
@@ -98,7 +103,7 @@ body {
     height: 100%;
     width: 260px;
     position: fixed;
-    border-right: 1px solid var(--border-color);
+    border-right: 1px solid var(--border-color-primary);
 }
 
 .side-nav ul{
@@ -1428,4 +1433,130 @@ body.flash-active > *:not(.flash-overlay) {
 [data-theme="dark"] .progress-note {
     background-color: var(--bg-quadiary);
     border-color: var(--border-color-secondary);
+}
+
+.title-bar {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    width: 100%;
+    height: 30px;
+    background-color: var(--bg-secondary);
+    border-bottom: 2px solid var(--border-color-primary);
+    z-index: 1000;
+    -webkit-app-region: drag;
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+}
+
+.title-bar-buttons {
+    height: 100%;
+    margin-left: auto;
+    display: flex;
+}
+
+.title-bar-buttons button {
+    -webkit-app-region: no-drag;
+    padding: 0 10px;
+    background: none;
+    border: none;
+    font-family: 'SF UI Text Regular';
+    color: var(--text-primary);
+    font-size: 16px;
+    cursor: pointer;
+}
+
+.title-bar-buttons button img {
+    filter: brightness(0) saturate(100%);
+    height: 16px;
+    width: 16px;
+}
+
+[data-theme="dark"] .title-bar-buttons button img {
+    filter: brightness(0) saturate(100%) invert(1);
+}
+
+.minimize-button:hover, .maximize-button:hover {
+    background-color: var(--bg-quadiary);
+    transition: all 0.3s ease;
+}
+
+.close-button:hover {
+    background-color: rgba(218, 46, 37, 0.679);
+    transition: all 0.3s ease;
+}
+
+.modal-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.5);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    z-index: 10000;
+    backdrop-filter: blur(4px);
+}
+
+.modal-content {
+    font-family: 'SF UI Text Regular';
+    background: var(--bg-primary);
+    border: 1px solid var(--border-color-primary);
+    border-radius: 16px;
+    padding: 30px;
+    min-width: 300px;
+    text-align: center;
+    box-shadow: 0 8px 32px var(--shadow);
+}
+
+.modal-content h3 {
+    margin: 0 0 15px 0;
+    color: var(--text-primary);
+    font-size: 18px;
+    font-weight: 600;
+}
+
+.modal-content p {
+    margin: 0 0 25px 0;
+    color: var(--text-secondary);
+    font-size: 14px;
+}
+
+.modal-buttons {
+    display: flex;
+    gap: 15px;
+    justify-content: center;
+}
+
+.btn-cancel, .btn-confirm {
+    padding: 10px 20px;
+    border: none;
+    border-radius: 8px;
+    font-size: 14px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.btn-cancel {
+    background: var(--bg-tertiary);
+    color: var(--text-primary);
+    border: 1px solid var(--border-color-primary);
+}
+
+.btn-cancel:hover {
+    background: var(--bg-secondary);
+}
+
+.btn-confirm {
+    background: #FF3B30;
+    color: white;
+}
+
+.btn-confirm:hover {
+    background: #D70015;
 }
