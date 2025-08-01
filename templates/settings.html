@@ -1,1 +1,49 @@
-{ % extends 'nav.html' % }
+{% extends 'nav.html' %}
+
+{% block title %}Settings - iTuneUp{% endblock %}
+
+{% block content %}
+
+<div class="settings-container" id="settingsContainer">
+    <div class="settings-content">
+        <h1>Settings</h1>
+        
+        <div class="settings-section">
+            <h3>Appearance</h3>
+            <div class="setting-item">
+                <div class="setting-info">
+                    <span class="setting-title">Dark Mode</span>
+                    <span class="setting-description">Toggle between light and dark theme</span>
+                </div>
+                <div class="toggle-switch">
+                    <input type="checkbox" id="darkModeToggle" class="toggle-input">
+                    <label for="darkModeToggle" class="toggle-label">
+                        <span class="toggle-button"></span>
+                    </label>
+                </div>
+            </div>
+        </div>
+        
+        <div class="settings-section">
+            <h3>Library</h3>
+            <div class="setting-item">
+                <div class="setting-info">
+                    <span class="setting-title">Auto-scan Library</span>
+                    <span class="setting-description">Automatically scan for new albums</span>
+                </div>
+                <div class="toggle-switch">
+                    <input type="checkbox" id="autoScanToggle" class="toggle-input">
+                    <label for="autoScanToggle" class="toggle-label">
+                        <span class="toggle-button"></span>
+                    </label>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+{% endblock %}
+
+{% block scripts %}
+<script src="{{ url_for('static', filename='js/settings.js') }}"></script>
+{% endblock %}

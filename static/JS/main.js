@@ -7,7 +7,55 @@ const flashBtnContainer = document.querySelector('.flash-button-container');
 const startSearchbtn = document.querySelector('.start-searching-btn-container');
 const libraryContainer = document.getElementById('libraryContainer');
 
+function isDarkMode() {
+    return document.documentElement.getAttribute('data-theme') === 'dark';
+}
+
+function getThemeColors() {
+    if (isDarkMode()) {
+        return {
+            wrapper: {
+                start: '#2C2C2E',
+                end: '#1C1C1E'
+            },
+            button: {
+                start: '#0A84FF',
+                end: '#007AFF'
+            },
+            searchResult: {
+                start: '#2C2C2E',
+                end: '#3A3A3C'
+            },
+            noButton: {
+                start: '#3A3A3C',
+                end: '#48484A'
+            }
+        };
+    } else {
+        return {
+            wrapper: {
+                start: '#FFFFFF',
+                end: '#F5F5F5'
+            },
+            button: {
+                start: '#0091FF',
+                end: '#00ffea'
+            },
+            searchResult: {
+                start: '#F5F5F5',
+                end: '#ececec'
+            },
+            noButton: {
+                start: '#F7F7F7',
+                end: '#0000001a'
+            }
+        };
+    }
+}
+
 document.addEventListener('mousemove', (e) => {
+
+    colors = getThemeColors();
 
     if (wrapper) {
         const rect = wrapper.getBoundingClientRect();
@@ -15,7 +63,7 @@ document.addEventListener('mousemove', (e) => {
         const y = e.clientY - rect.top;
 
         const angle = Math.atan2(y - rect.height / 2, x - rect.width / 2) * (180 / Math.PI);
-        wrapper.style.background = `linear-gradient(${angle}deg, #FFFFFF, #F5F5F5)`;
+        wrapper.style.background = `linear-gradient(${angle}deg, ${colors.wrapper.start}, ${colors.wrapper.end})`;
     }
     
     if (searchButton && !searchButton.classList.contains('disabled')) {
@@ -24,7 +72,7 @@ document.addEventListener('mousemove', (e) => {
         const buttonY = e.clientY - buttonRect.top;
 
         const buttonAngle = Math.atan2(buttonY - buttonRect.height / 2, buttonX - buttonRect.width / 2) * (180 / Math.PI);
-        searchButton.style.background = `linear-gradient(${buttonAngle}deg, #0091FF, #00ffea)`;
+        searchButton.style.background = `linear-gradient(${buttonAngle}deg, ${colors.button.start}, ${colors.button.end})`;
     }
 
     if (searchResultContainer) {
@@ -33,8 +81,9 @@ document.addEventListener('mousemove', (e) => {
         const resultY = e.clientY - resultRect.top;
 
         const resultAngle = Math.atan2(resultY - resultRect.height / 2, resultX - resultRect.width / 2) * (180 / Math.PI);
-        searchResultContainer.style.background = `linear-gradient(${resultAngle}deg, #F5F5F5, #ececec)`;
-    }
+        searchResultContainer.style.background = `linear-gradient(${resultAngle}deg, ${colors.searchResult.start}, ${colors.searchResult.end})`;
+
+    }    
 
     if (yesBtnContainer) {
         const yesRect = yesBtnContainer.getBoundingClientRect();
@@ -42,7 +91,7 @@ document.addEventListener('mousemove', (e) => {
         const yesY = e.clientY - yesRect.top;
 
         const yesAngle = Math.atan2(yesY - yesRect.height / 2, yesX - yesRect.width / 2) * (180 / Math.PI);
-        yesBtnContainer.style.background = `linear-gradient(${yesAngle}deg, #0091FF, #00ffea)`;
+        yesBtnContainer.style.background = `linear-gradient(${yesAngle}deg, ${colors.button.start}, ${colors.button.end})`;
     }
 
     if (noBtnContainer) {
@@ -51,7 +100,7 @@ document.addEventListener('mousemove', (e) => {
         const noY = e.clientY - noRect.top;
 
         const noAngle = Math.atan2(noY - noRect.height / 2, noX - noRect.width / 2) * (180 / Math.PI);
-        noBtnContainer.style.background = `linear-gradient(${noAngle}deg, #F7F7F7, #0000001a)`;
+        noBtnContainer.style.background = `linear-gradient(${noAngle}deg, ${colors.noButton.start}, ${colors.noButton.end})`;
     }
 
     if (flashBtnContainer) {
@@ -60,7 +109,7 @@ document.addEventListener('mousemove', (e) => {
         const flashY = e.clientY - flashRect.top;
 
         const flashAngle = Math.atan2(flashY - flashRect.height / 2, flashX - flashRect.width / 2) * (180 / Math.PI);
-        flashBtnContainer.style.background = `linear-gradient(${flashAngle}deg, #0091FF, #00ffea)`;
+        flashBtnContainer.style.background = `linear-gradient(${flashAngle}deg, ${colors.button.start}, ${colors.button.end})`;
     }
 
     if (startSearchbtn) {
@@ -69,9 +118,18 @@ document.addEventListener('mousemove', (e) => {
         const stsY = e.clientY - stsRect.top;
 
         const stsAngle = Math.atan2(stsY - stsRect.height / 2, stsX - stsRect.width / 2) * (180 / Math.PI);
-        startSearchbtn.style.background = `linear-gradient(${stsAngle}deg, #0091FF, #00ffea)`;
+        startSearchbtn.style.background = `linear-gradient(${stsAngle}deg, ${colors.button.start}, ${colors.button.end})`;
     }
 
+});
+
+document.addEventListener('themechange', function() {
+    const elements = [wrapper, searchButton, searchResultContainer, yesBtnContainer, noBtnContainer, flashBtnContainer, startSearchbtn];
+    elements.forEach(element => {
+        if (element) {
+            element.style.background = '';
+        }
+    });
 });
 
 function closeFlash() {
@@ -96,6 +154,10 @@ function closeFlash() {
 
 
 document.addEventListener('DOMContentLoaded', function() {
+
+    setTimeout(() => {
+        document.body.classList.remove('no-transition');
+    }, 100);
 
     const searchBtn = document.getElementById('search-btn');
     const loadingGif = document.getElementById('loading-gif');

@@ -1,3 +1,19 @@
+import os
+import warnings
+
+
+os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
+os.environ['TF_ENABLE_ONEDNN_OPTS'] = '0'
+warnings.filterwarnings('ignore', category=FutureWarning)
+warnings.filterwarnings('ignore', category=UserWarning)
+
+import tensorflow as tf
+if hasattr(tf, 'config'):
+    try:
+        tf.config.experimental.set_memory_growth(tf.config.list_physical_devices('GPU')[0], True)
+    except:
+        pass
+
 from flask import Flask, render_template, redirect, request, flash, session
 from forms import SearchForm, ConfirmForm
 from selenium import webdriver
@@ -5,7 +21,6 @@ from selenium.webdriver.common.by import By
 from selenium.webdriver.chrome.service import Service
 from selenium.common.exceptions import NoSuchElementException
 from mutagen.mp4 import MP4, MP4FreeForm, MP4Cover
-import os
 import contextlib
 import sys
 import yt_dlp
@@ -160,160 +175,53 @@ def recover_metadata(file_path):
 
 def download_as_mp3(youtube_url, library_dir, task_id):
 
-    def progress_hook(d):
-
-        if task_id and d['status'] == 'downloading':
-            if '_percent_str' in d and d['_percent_str']:
-                try:
-                    percent_str = d['_percent_str'].replace('%', '').strip()
-                    download_percent = float(percent_str)
-
-                    overall_percent = 30 + (download_percent * 0.3)
-                    update_progress(task_id, f"Downloading track: {download_percent:.1f}%", int(overall_percent))
-                except (ValueError, TypeError):
-                    pass
-
     ydl_opts = {
         'format': 'bestaudio/best',
-        'outtmpl':  os.path.join(library_dir, '%(title)s/1 %(title)s.%(ext)s'),
-        'progress_hooks': [progress_hook],
+        'outtmpl': os.path.join(library_dir, '%(title)s/1 %(title)s.%(ext)s'),
         'postprocessors': [{
             'key': 'FFmpegExtractAudio',
             'preferredcodec': 'mp3',
             'preferredquality': '320',
         }],
-        'quiet': False,
+        'quiet': True,
         'noplaylist': True,
     }
+    
     with yt_dlp.YoutubeDL(ydl_opts) as ydl:
         info = ydl.extract_info(youtube_url, download=True)
-
+    
+    update_progress(task_id, "Download completed, converting...", 60)
     return info['title']
 
 def download_playlist(url, library_dir, task_id, audio_format='mp3', quality='320'):
-    
-    # Track playlist progress
-    playlist_info = {'current_track': 0, 'total_tracks': 0, 'extracted_info': False}
-    
-    def progress_hook(d):
-        if d['status'] == 'downloading':
-            # Try multiple ways to get progress information
-            progress_percent = None
-            
-            # Method 1: Try _percent_str
-            if '_percent_str' in d and d['_percent_str']:
-                try:
-                    percent_str = d['_percent_str'].replace('%', '').strip()
-                    progress_percent = float(percent_str)
-                except (ValueError, TypeError):
-                    pass
-            
-            # Method 2: Try downloaded_bytes and total_bytes
-            if progress_percent is None and 'downloaded_bytes' in d and 'total_bytes' in d:
-                try:
-                    if d['total_bytes'] and d['total_bytes'] > 0:
-                        progress_percent = (d['downloaded_bytes'] / d['total_bytes']) * 100
-                except (TypeError, ZeroDivisionError):
-                    pass
-            
-            # Method 3: Try fragment info
-            if progress_percent is None and 'fragment_index' in d and 'fragment_count' in d:
-                try:
-                    if d['fragment_count'] and d['fragment_count'] > 0:
-                        progress_percent = (d['fragment_index'] / d['fragment_count']) * 100
-                except (TypeError, ZeroDivisionError):
-                    pass
-            
-            # Calculate overall progress
-            if progress_percent is not None:
-                # If we know the total tracks, calculate more accurate progress
-                if playlist_info['total_tracks'] > 0:
-                    track_progress = (playlist_info['current_track'] / playlist_info['total_tracks']) * 100
-                    current_track_progress = (progress_percent / playlist_info['total_tracks'])
-                    overall_percent = track_progress + current_track_progress
-                else:
-                    # Fallback to simple mapping
-                    overall_percent = progress_percent
-                
-                # Map to 30% - 60% range
-                final_percent = 30 + (min(overall_percent, 100) * 0.3)
-                
-                # Get track info
-                filename = d.get('filename', 'Unknown track')
-                if filename:
-                    track_name = os.path.basename(filename).split('.')[0]
-                    # Remove track numbers and clean up
-                    track_name = re.sub(r'^\d+\s+', '', track_name)
-                else:
-                    track_name = f"Track {playlist_info['current_track'] + 1}"
-                
-                update_progress(task_id, f"Downloading: {track_name} ({progress_percent:.1f}%)", int(final_percent))
-            else:
-                # Fallback when no progress info is available
-                filename = d.get('filename', 'Unknown track')
-                if filename:
-                    track_name = os.path.basename(filename).split('.')[0]
-                    track_name = re.sub(r'^\d+\s+', '', track_name)
-                else:
-                    track_name = f"Track {playlist_info['current_track'] + 1}"
-                
-                update_progress(task_id, f"Downloading: {track_name}", None)
-        
-        elif d['status'] == 'finished':
-            playlist_info['current_track'] += 1
-            filename = d.get('filename', 'Unknown track')
-            if filename:
-                track_name = os.path.basename(filename).split('.')[0]
-                track_name = re.sub(r'^\d+\s+', '', track_name)
-            else:
-                track_name = f"Track {playlist_info['current_track']}"
-            
-            # Calculate progress based on completed tracks
-            if playlist_info['total_tracks'] > 0:
-                track_progress = (playlist_info['current_track'] / playlist_info['total_tracks']) * 100
-                final_percent = 30 + (track_progress * 0.3)
-                update_progress(task_id, f"Completed: {track_name} ({playlist_info['current_track']}/{playlist_info['total_tracks']})", int(final_percent))
-            else:
-                update_progress(task_id, f"Completed: {track_name}", None)
-
-    # Hook to extract playlist info
-    def playlist_info_hook(d):
-        if d.get('_type') == 'playlist' and not playlist_info['extracted_info']:
-            playlist_info['total_tracks'] = len(d.get('entries', []))
-            playlist_info['extracted_info'] = True
-            print(f"Playlist detected with {playlist_info['total_tracks']} tracks")
 
     ydl_opts = {
         'format': 'bestaudio/best',
         'outtmpl': os.path.join(library_dir, '%(playlist_title)s/%(playlist_index)d %(title)s.%(ext)s'),
         'ignoreerrors': True,
-        'quiet': True,  # Set to True to reduce console spam
-        'progress_hooks': [progress_hook],
+        'quiet': True,
         'postprocessors': [{
             'key': 'FFmpegExtractAudio',
             'preferredcodec': audio_format,
             'preferredquality': quality,
         }],
         'noplaylist': False,
-        # Add extract_flat to get playlist info first
-        'extract_flat': False,
     }
 
     with YoutubeDL(ydl_opts) as ydl:
         try:
-            # First extract playlist info
+            update_progress(task_id, "Getting playlist info...", 25)
             info = ydl.extract_info(url, download=False)
-            if info.get('_type') == 'playlist':
-                playlist_info['total_tracks'] = len(info.get('entries', []))
-                playlist_info['extracted_info'] = True
-                update_progress(task_id, f"Found playlist with {playlist_info['total_tracks']} tracks", 30)
-            
-            # Now download
+            track_count = len(info.get('entries', []))
+            update_progress(task_id, f"Starting download of {track_count} tracks", 30)
+
             ydl.download([url])
+
+            update_progress(task_id, "Download completed, converting files...", 60)
             
         except Exception as e:
             print(f"Error downloading playlist: {e}")
-            update_progress(task_id, f"Download error: {str(e)}", None)
+            update_progress(task_id, f"Download error: {str(e)}", -1)
 
 def find_matching_folder(search_title, directory):
 
@@ -333,7 +241,6 @@ def convert_all_mp3_to_m4a(folder_path, task_id, delete_original=False):
 
     mp3_files = [f for f in os.listdir(folder_path) if f.lower().endswith(".mp3")]
     total_files = len(mp3_files)
-
     converted_count = 0
 
     for filename in mp3_files:
@@ -341,22 +248,17 @@ def convert_all_mp3_to_m4a(folder_path, task_id, delete_original=False):
         m4a_path = os.path.join(folder_path, os.path.splitext(filename)[0] + ".m4a")
             
         try:
+            if converted_count % 5 == 0 or converted_count == total_files - 1:
+                progress_percent = 60 + (converted_count / total_files * 20)
+                update_progress(task_id, f"Converting files... {converted_count + 1}/{total_files}", int(progress_percent))
 
-            progress_percent = 60 + (converted_count / total_files * 20)
-            update_progress(task_id, f"Converting {filename}...", int(progress_percent))
-
-            print(f"Converting: {filename} → {os.path.basename(m4a_path)}")
             audio = AudioSegment.from_mp3(mp3_path)
             audio.export(m4a_path, format="ipod")
                 
             if delete_original:
                 os.remove(mp3_path)
-                print(f"Deleted original: {filename}")
 
             converted_count += 1
-
-            progress_percent = 60 + (converted_count / total_files * 20)
-            update_progress(task_id, f"Converted {converted_count}/{total_files} files", int(progress_percent))
 
         except Exception as e:
             print(f"Failed to convert {filename}: {e}")
@@ -755,7 +657,6 @@ def calculate_album_duration(folder_path):
                 audio = MP4(file_path)
                 duration = audio.info.length
                 total_duration += duration
-                track_count += 1
             except Exception as e:
                 print(f"Error reading {file_path}: {e}")
 
@@ -851,7 +752,6 @@ def album_cover(album_folder):
     if not os.path.exists(folder_path):
         return "", 404
     
-    # Find first M4A file and extract cover
     for file_name in os.listdir(folder_path):
         if file_name.lower().endswith('.m4a'):
             file_path = os.path.join(folder_path, file_name)
@@ -869,11 +769,8 @@ def album_cover(album_folder):
 @app.route('/progress/<task_id>')
 def progress(task_id):
 
-    progress = download_progress.get(task_id, {'message': 'Starting...', 'percentage': 0})
-    return {
-        'message': progress['message'],
-        'percentage': progress['percentage']
-    }
+    progress_data = download_progress.get(task_id, {'message': 'Starting...', 'percentage': 0})
+    return progress_data
 
 @app.route('/', methods=['GET', 'POST'])
 def home():
@@ -907,7 +804,14 @@ def home():
                 task_id = str(uuid.uuid4())
                 session['current_task'] = task_id
 
-                thread = threading.Thread(target=download_with_progress, args=(current_search, task_id))
+                def run_download():
+                    try:
+                        download_with_progress(current_search, task_id)
+                    except Exception as e:
+                        print(f"Download thread error: {str(e)}")
+                        update_progress(task_id, f'Error: {str(e)}', -1)
+
+                thread = threading.Thread(target=run_download)
                 thread.daemon = True
                 thread.start()
 
