@@ -1288,10 +1288,10 @@ body.flash-active > *:not(.flash-overlay) {
     padding: 40px;
     max-width: 800px;
     margin: 0 auto;
-    margin-left: 260px;
 }
 
 .settings-content h1 {
+    text-align: center;
     font-family: 'SF PRO Bold';
     font-size: 48px;
     color: var(--text-primary);
@@ -1323,6 +1323,7 @@ body.flash-active > *:not(.flash-overlay) {
     align-items: center;
     padding: 15px 0;
     border-bottom: 1px solid var(--shadow);
+    gap: 25px;
 }
 
 .setting-item:last-child {
@@ -1374,12 +1375,13 @@ body.flash-active > *:not(.flash-overlay) {
     height: 28px;
     background: var(--bg-primary);
     border-radius: 50%;
-    transition: all 0.3s ease;
+    transition: all 0.4s cubic-bezier(0.25, 0.46, 0.45, 0.94);
     box-shadow: 0 2px 4px var(--shadow);
 }
 
 .toggle-input:checked + .toggle-label {
     background: #34C759;
+    transition: all 0.3s cubic-bezier(0.25, 0.46, 0.45, 0.94);
 }
 
 .toggle-input:checked + .toggle-label .toggle-button {

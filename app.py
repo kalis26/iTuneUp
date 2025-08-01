@@ -1,28 +1,11 @@
 import os
-import warnings
-
-
-os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
-os.environ['TF_ENABLE_ONEDNN_OPTS'] = '0'
-warnings.filterwarnings('ignore', category=FutureWarning)
-warnings.filterwarnings('ignore', category=UserWarning)
-
-import tensorflow as tf
-if hasattr(tf, 'config'):
-    try:
-        tf.config.experimental.set_memory_growth(tf.config.list_physical_devices('GPU')[0], True)
-    except:
-        pass
-
-from flask import Flask, render_template, redirect, request, flash, session
+from flask import Flask, render_template, request, flash, session
 from forms import SearchForm, ConfirmForm
 from selenium import webdriver
 from selenium.webdriver.common.by import By
 from selenium.webdriver.chrome.service import Service
 from selenium.common.exceptions import NoSuchElementException
 from mutagen.mp4 import MP4, MP4FreeForm, MP4Cover
-import contextlib
-import sys
 import yt_dlp
 from yt_dlp import YoutubeDL
 from pydub import AudioSegment
@@ -31,30 +14,11 @@ import re
 import difflib
 import threading
 import time
-import json
 import uuid
+import secrets
 
 app = Flask(__name__)
-app.config['SECRET_KEY'] = 'Password1594826kjk!'
-
-@contextlib.contextmanager
-def suppress_stderr():
-
-    with open(os.devnull, 'w') as devnull:
-        old_stderr = sys.stderr
-        sys.stderr = devnull
-        try:
-            yield
-        finally:
-            sys.stderr = old_stderr
-
-def get_yes_no(prompt):
-
-    while True:
-        answer = input(prompt + " (yes/no): ").strip().lower()
-        if answer in ("yes", "no"):
-            return answer
-        print("Please enter 'yes' or 'no'.")
+app.config['SECRET_KEY'] = secrets.token_urlsafe(32)
 
 def add_metadata(file_path, image_path, artists, album, albumartist, albumsort, artist, artistsort, compilation, copyright, 
                  discnumber, genre, itunesadvisory, itunesalbumid, itunesartistid, itunescatalogid, itunesgenreid,
@@ -158,7 +122,7 @@ def add_metadata(file_path, image_path, artists, album, albumartist, albumsort, 
 def recover_metadata(file_path):
 
     metadata = {}
-    with open(file_path, 'r', encoding='utf-8') as f:  # <-- Add encoding
+    with open(file_path, 'r', encoding='utf-8') as f:
         for line in f:
             key, value = line.strip().split('| ', 1)
             key = key.strip()
@@ -323,9 +287,7 @@ def show_search_results(form, confirm_form, title, artist, searchid):
     options = webdriver.ChromeOptions()
     options.add_argument("--headless")
     service = Service(log_path=os.devnull)
-    
-    with suppress_stderr():
-        driver = webdriver.Chrome(service=service, options=options)
+    driver = webdriver.Chrome(service=service, options=options)
 
     try:
 
@@ -478,7 +440,7 @@ def download_with_progress(current_search, task_id):
                     artists_list = [artists]
 
                 music_file_found = False
-                # Find the music file for this prefix
+
                 for filename in os.listdir(matched_folder):
                     if filename.startswith(str(prefix)):
                         music_filepath = os.path.join(matched_folder, filename)
@@ -855,4 +817,4 @@ def settings():
     return render_template('settings.html', active_page='Settings')
 
 if __name__ == '__main__':
-    app.run(debug=True)
+    app.run()
