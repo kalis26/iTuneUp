@@ -16,6 +16,7 @@
 *.spec
 
 build/
+Output/
 
 # User-specific files (MonoDevelop/Xamarin Studio)
 *.userprefs
