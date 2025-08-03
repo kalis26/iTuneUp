@@ -12,6 +12,8 @@
 *.env
 
 *.exe
+*.iss
+*.spec
 
 build/
 
