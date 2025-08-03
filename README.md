@@ -1,6 +1,5 @@
-# iTuneUp
-iTuneUp is a Python-powered utility designed to streamline the process of building a rich, Apple-like local music library. It allows users to download songs and albums from YouTube, convert them to high-efficiency `.m4a` audio files **(encoded with the AAC codec)**, and embed rich metadata scraped directly from the Apple Music website — including artwork, track listings, and artist details.\
-Whether you’re looking to preserve your favorite albums with authentic presentation, or automate the transformation of YouTube content into Apple Music–style files, **iTuneUp** merges content sourcing, transcoding, and metadata injection into a single intuitive tool.
+# iTuneUp – Apple Music-style Downloads for Local Libraries
+<img src="resources/logo.png" width="24px" height="24px" align="center"> **iTuneUp** is a standalone Windows desktop application that lets you build a local `.m4a` music library styled after Apple Music, using content sourced from YouTube and metadata from Apple’s own public database. Unlike conventional downloaders, iTuneUp delivers an authentic, metadata-rich music collection — with cover art, track order, release dates, and more — just like purchased albums in iTunes.
 
 <div align="center">
   
@@ -11,8 +10,8 @@ Whether you’re looking to preserve your favorite albums with authentic present
   
 </div>
 
-## Core Features
-- Download full albums or individual tracks from YouTube via simple search queries.
+## ✨ Core Features
+- Download entire albums or individual tracks directly from YouTube via search.
 - Convert audio streams into `.m4a` (MPEG-4 Part 14) format using the **Advanced Audio Coding (AAC)** codec — the same audio compression used by Apple Music.
 - Enrich downloaded files with Apple Music metadata, including:
   * Track title
@@ -22,41 +21,38 @@ Whether you’re looking to preserve your favorite albums with authentic present
   * Track order, genre, and Apple Music-specific tags
 - Automatically name and organize files for proper integration with iTunes or third-party players.
 - Create a truly **"Apple Music–like" experience** for your local music collection — without subscriptions.
+- Native Windows installer with:
+  * Shortcut creation
+  * Uninstaller
+  * Optional installation path
+- Modern UI powered by a built-in WebView interface (no browser needed)
 
-## Technologies Used
-- Python 3.12+
-- [yt-dlp](https://github.com/yt-dlp/yt-dlp) -- for high-accuracy YouTube media downloading
-- [ffmpeg](https://ffmpeg.org/) -- for audio conversion and stream extraction
-- [mutagen](https://mutagen.readthedocs.io/) -- for embedding metadata into `.m4a` files
-- Selenium + requests – to scrape and retrieve metadata from Apple Music’s public web pages
+## 📦 Technologies Used
+- **Language:** Python 3.12.7
+- **GUI:** [Flask](https://flask.palletsprojects.com/en/stable/) backend + [PyWebView](https://pywebview.flowrl.com/) native shell
+- **Download engine:** [yt-dlp](https://github.com/yt-dlp/yt-dlp) -- for high-accuracy YouTube media downloading
+- **Audio conversion:** [ffmpeg](https://ffmpeg.org/) -- for audio conversion and stream extraction
+- **Metadata embedding:** [mutagen](https://mutagen.readthedocs.io/) -- for embedding metadata into `.m4a` files
+- **Metadata scraping:** Selenium + requests – to scrape and retrieve metadata from Apple Music’s public web pages
 
-## System Requirements
-- **Python:** 3.9 or higher
-- **Operating System:** Windows 10+ (Linux/macOS support possible with minor tweaks)
-- **FFmpeg:** Must be installed and accessible via system PATH
-- **Google Chrome:** Required for Apple Music scraping (headless via Selenium)
-
-### Python Dependencies
-Install required packages using:
+## 🖥️ System Requirements
+- **Operating System:** Windows 10 (64 bits) or later
+- **Disk Space:** ~150 MB (excluding downloaded music)
+- **Internet Access:** Required for metadata & download
+- **Google Chrome:** Required for Apple Music scraping
 ```
-pip install yt-dlp selenium mutagen requests
+⚠️ Python & dependencies are not required, as iTuneUp is packaged as a complete .exe app.
 ```
 
-## How to run?
-1. Open a terminal in the project folder.
-   
-2. Launch the app:
-  ```
-  python iTuneUp.py
-  ```
-3. Follow prompts to:
-  * Input an Apple Music song or album
-  * Provide the artist info (used to find matching Apple Music metadata)
-4. iTuneUp will:
-  * Download and convert the media to `.m4a`
-  * Scrape and match metadata from Apple Music
-  * Embed metadata and artwork into each track
-5. Final `.m4a` files will be saved in the `{album_name}/` folder in the programs directory, ready to be added to iTunes.
+## 📂 Installation & Uninstallation
+- Download `iTuneUp-Setup.exe` from the [Releases](https://github.com/kalis26/iTuneUp/releases)
+- Run the installer — you can:
+  * Choose install location
+  * Add desktop/start menu shortcut
+- To uninstall, go to **Control Panel > Apps > iTuneUp**, or run `Uninstall iTuneUp` from the Start menu
+
+## 🔒 License
+Licensed under the [MIT License](https://github.com/kalis26/iTuneUp/blob/main/LICENSE)
 
 ## Use Cases
 - Build a curated, metadata-rich `.m4a` library using free online content.
