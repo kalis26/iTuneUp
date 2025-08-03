@@ -55,7 +55,7 @@
                 </p>
 
                 <!-- Show Yes/No buttons -->
-                <form action="" method="post" class="confirm-form" novalidate>
+                <form action="" method="post" class="confirm-form" novalidate id="confirm-form">
                     {{ confirm_form.hidden_tag() }}
                     <p>
                         <div class="confirm-buttons-container">
@@ -64,6 +64,7 @@
                             </div>
                             <div class="no-button-container">
                                 {{ confirm_form.no(class="confirm-button no-button", id="no-btn") }}
+                                <img src="{{ url_for('static', filename='images/loading.gif') }}" alt="Loading Gif" class="loading-gif" id="no-loading-gif">
                             </div>                   
                         </div>
                     </p>

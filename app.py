@@ -1,4 +1,5 @@
 import os
+import sys
 from flask import Flask, render_template, request, flash, session
 from forms import SearchForm, ConfirmForm
 from selenium import webdriver
@@ -18,8 +19,18 @@ import uuid
 import secrets
 import threading
 import webview
+import json
+import socket
 
-app = Flask(__name__)
+def resource_path(relative_path):
+    try:
+        base_path = sys._MEIPASS
+    except Exception:
+        base_path = os.path.abspath(".")
+
+    return os.path.join(base_path, relative_path)
+
+app = Flask(__name__, template_folder=resource_path('templates'), static_folder=resource_path('static'))
 app.config['SECRET_KEY'] = secrets.token_urlsafe(32)
 
 def add_metadata(file_path, image_path, artists, album, albumartist, albumsort, artist, artistsort, compilation, copyright, 
@@ -152,7 +163,7 @@ def download_as_mp3(youtube_url, library_dir, task_id):
         'quiet': True,
         'noplaylist': True,
     }
-    
+
     with yt_dlp.YoutubeDL(ydl_opts) as ydl:
         info = ydl.extract_info(youtube_url, download=True)
     
@@ -278,7 +289,11 @@ def cleanup_metadata_dir(metadata_dir):
 
 def setup_directories():
 
-    app_dir = os.path.dirname(os.path.abspath(__file__))
+    if getattr(sys, 'frozen', False):
+        app_dir = os.path.dirname(sys.executable)
+    else:
+        app_dir = os.path.dirname(os.path.abspath(__file__))
+
     metadata_dir = os.path.join(app_dir, "metadata")
     library_dir = os.path.join(app_dir, "library")
     os.makedirs(metadata_dir, exist_ok=True)
@@ -635,7 +650,11 @@ def calculate_album_duration(folder_path):
 
 def scan_library():
 
-    app_dir = os.path.dirname(os.path.abspath(__file__))
+    if getattr(sys, 'frozen', False):
+        app_dir = os.path.dirname(sys.executable)
+    else:
+        app_dir = os.path.dirname(os.path.abspath(__file__))
+
     library_dir = os.path.join(app_dir, "library")
 
     if not os.path.exists(library_dir):
@@ -711,7 +730,11 @@ def library():
 @app.route('/album_cover/<album_folder>')
 def album_cover(album_folder):
 
-    app_dir = os.path.dirname(os.path.abspath(__file__))
+    if getattr(sys, 'frozen', False):
+        app_dir = os.path.dirname(sys.executable)
+    else:
+        app_dir = os.path.dirname(os.path.abspath(__file__))
+
     library_dir = os.path.join(app_dir, "library")
     folder_path = os.path.join(library_dir, album_folder)
     
@@ -857,11 +880,76 @@ def api_close():
         return {'status': 'success'}
     except Exception as e:
         return {'status': 'error', 'message': str(e)}
+    
+@app.route('/api/save_setting', methods=['POST'])
+def save_setting():
+    try:
+        data = request.get_json()
+        key = data.get('key')
+        value = data.get('value')
+        
+        if not key:
+            return {'status': 'error', 'message': 'Key is required'}
+        
+        if getattr(sys, 'frozen', False):
+            app_dir = os.path.dirname(sys.executable)
+        else:
+            app_dir = os.path.dirname(os.path.abspath(__file__))
+        
+        settings_file = os.path.join(app_dir, 'user_settings.json')
+        
+        settings = {}
+        if os.path.exists(settings_file):
+            try:
+                with open(settings_file, 'r') as f:
+                    settings = json.load(f)
+            except:
+                settings = {}
+        
+        settings[key] = value
+
+        with open(settings_file, 'w') as f:
+            json.dump(settings, f)
+        
+        return {'status': 'success'}
+    except Exception as e:
+        return {'status': 'error', 'message': str(e)}
+    
+@app.route('/api/load_settings')
+def load_settings():
+    try:
+        if getattr(sys, 'frozen', False):
+            app_dir = os.path.dirname(sys.executable)
+        else:
+            app_dir = os.path.dirname(os.path.abspath(__file__))
+        
+        settings_file = os.path.join(app_dir, 'user_settings.json')
+
+        settings = {}
+        if os.path.exists(settings_file):
+            try:
+                with open(settings_file, 'r') as f:
+                    settings = json.load(f)
+            except:
+                settings = {}
+        
+        return {'status': 'success', 'settings': settings}
+    except Exception as e:
+        return {'status': 'error', 'message': str(e), 'settings': {}}
 
 def run_flask():
     app.run(host='127.0.0.1', port=5000, debug=False)
 
 if __name__ == '__main__':
+
+    if os.name == 'nt':
+        import subprocess
+        original_popen = subprocess.Popen
+        def hidden_popen(*args, **kwargs):
+            if 'creationflags' not in kwargs:
+                kwargs['creationflags'] = subprocess.CREATE_NO_WINDOW
+            return original_popen(*args, **kwargs)
+        subprocess.Popen = hidden_popen
     
     threading.Thread(target=run_flask, daemon=True).start()
 
@@ -872,7 +960,9 @@ if __name__ == '__main__':
         width=1440,
         height=820,
         resizable=True,
-        frameless=True
+        frameless=True,
+        on_top=False,
+        shadow=True,
     )
 
-    webview.start(gui='edgechromium', debug=True)
+    webview.start(gui='edgechromium', debug=False, private_mode=False, storage_path=None)

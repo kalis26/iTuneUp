@@ -1,3 +1,83 @@
+class StorageManager {
+    constructor() {
+        this.isLocalStorageAvailable = this.testLocalStorage();
+        this.fallbackStorage = {};
+        console.log('Storage available:', this.isLocalStorageAvailable);
+    }
+    
+    testLocalStorage() {
+        try {
+            const test = 'storage_test';
+            localStorage.setItem(test, test);
+            localStorage.removeItem(test);
+            return true;
+        } catch(e) {
+            return false;
+        }
+    }
+    
+    setItem(key, value) {
+        if (this.isLocalStorageAvailable) {
+            try {
+                localStorage.setItem(key, value);
+                return true;
+            } catch(e) {
+                console.warn('LocalStorage setItem failed, using fallback');
+                this.isLocalStorageAvailable = false;
+            }
+        }
+        
+        this.fallbackStorage[key] = value;
+        
+        this.saveToServer(key, value);
+        return false;
+    }
+    
+    getItem(key) {
+        if (this.isLocalStorageAvailable) {
+            try {
+                return localStorage.getItem(key);
+            } catch(e) {
+                console.warn('LocalStorage getItem failed, using fallback');
+                this.isLocalStorageAvailable = false;
+            }
+        }
+        
+        return this.fallbackStorage[key] || null;
+    }
+
+    saveToServer(key, value) {
+        // Save settings to Flask backend
+        fetch('/api/save_setting', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ key: key, value: value })
+        }).catch(error => {
+            console.log('Server save failed:', error);
+        });
+    }
+    
+    loadFromServer() {
+        // Load settings from Flask backend
+        return fetch('/api/load_settings')
+            .then(response => response.json())
+            .then(data => {
+                if (data.settings) {
+                    Object.assign(this.fallbackStorage, data.settings);
+                }
+                return data.settings;
+            })
+            .catch(error => {
+                console.log('Server load failed:', error);
+                return {};
+            });
+    }
+}
+
+const storage = new StorageManager();
+
 const wrapper = document.querySelector('.form-container');
 const searchButton = document.querySelector('.form-button-container');
 const searchResultContainer = document.querySelector('.search-result-container');
@@ -9,6 +89,19 @@ const libraryContainer = document.getElementById('libraryContainer');
 
 function isDarkMode() {
     return document.documentElement.getAttribute('data-theme') === 'dark';
+}
+
+function toggleDarkMode() {
+    const currentTheme = document.documentElement.getAttribute('data-theme');
+    const isDark = currentTheme === 'dark';
+    const newTheme = isDark ? '' : 'dark';
+    
+    document.documentElement.setAttribute('data-theme', newTheme);
+    storage.setItem('darkMode', (!isDark).toString());
+
+    document.dispatchEvent(new Event('themechange'));
+    
+    console.log('Theme changed to:', newTheme || 'light');
 }
 
 function getThemeColors() {
@@ -152,8 +245,34 @@ function closeFlash() {
     }, 200);
 }
 
+function showNoLoading() {
+    const noButton = document.getElementById('no-button');
+    const noContainer = document.getElementById('no-button-container');
+    const noLoadingGif = document.getElementById('no-loading-gif');
+    
+    if (noButton && noContainer && noLoadingGif) {
+        noButton.classList.add('loading');
+        noButton.disabled = true;
+        noContainer.classList.add('disabled');
+        noLoadingGif.classList.add('show');
+    }
+}
 
 document.addEventListener('DOMContentLoaded', function() {
+
+    if (!storage.isLocalStorageAvailable) {
+        storage.loadFromServer().then(settings => {
+            if (settings.darkMode === 'true') {
+                document.documentElement.setAttribute('data-theme', 'dark');
+                document.dispatchEvent(new Event('themechange'));
+            }
+        });
+    } else {
+        const savedTheme = storage.getItem('darkMode');
+        if (savedTheme === 'true') {
+            document.documentElement.setAttribute('data-theme', 'dark');
+        }
+    }
 
     setTimeout(() => {
         document.body.classList.remove('no-transition');
@@ -163,6 +282,23 @@ document.addEventListener('DOMContentLoaded', function() {
     const loadingGif = document.getElementById('loading-gif');
     const form = document.querySelector('form');
     const flashOverlay = document.getElementById('flashOverlay');
+    const confirmForm = document.getElementById('confirm-form');
+    const darkModeToggle = document.getElementById('dark-mode-toggle');
+    
+    if (darkModeToggle) {
+        darkModeToggle.addEventListener('change', toggleDarkMode);
+        darkModeToggle.checked = isDarkMode();
+    }
+
+    if (confirmForm) {
+        confirmForm.addEventListener('submit', function(e) {
+            const submitter = e.submitter;
+            
+            if (submitter && submitter.name === 'no') {
+                showNoLoading();
+            }
+        });
+    }
 
     if (form && searchBtn) {
         form.addEventListener('submit', function(e) {
@@ -226,6 +362,12 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     }
 
+    console.log('=== Storage Debug ===');
+    console.log('localStorage available:', storage.isLocalStorageAvailable);
+    console.log('Storage test - setting theme preference...');
+    storage.setItem('test_setting', 'test_value');
+    console.log('Storage test - reading back:', storage.getItem('test_setting'));
+    console.log('===================');
 });
 
 document.addEventListener('keydown', function(event) {

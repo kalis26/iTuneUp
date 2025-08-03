@@ -5,12 +5,34 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Navigation Template</title>
     <script>
-        (function() {
-            const darkMode = localStorage.getItem('darkMode') === 'true';
-            if (darkMode) {
+    (function() {
+        function initializeTheme() {
+            try {
+                const test = 'webview_test';
+                localStorage.setItem(test, 'test_value');
+                const testValue = localStorage.getItem(test);
+                localStorage.removeItem(test);
+                
+                if (testValue === 'test_value') {
+                    console.log('LocalStorage working');
+                    const darkMode = localStorage.getItem('darkMode') === 'true';
+                    if (darkMode) {
+                        document.documentElement.setAttribute('data-theme', 'dark');
+                    }
+                    return true;
+                }
+            } catch (e) {
+                console.warn('LocalStorage not available:', e);
+            }
+            
+            if (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) {
                 document.documentElement.setAttribute('data-theme', 'dark');
             }
-        })();
+            return false;
+        }
+        
+        window.localStorageAvailable = initializeTheme();
+    })();
     </script>
     <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
 </head>
