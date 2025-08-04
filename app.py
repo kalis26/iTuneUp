@@ -20,7 +20,7 @@ import secrets
 import threading
 import webview
 import json
-import socket
+from pathlib import Path
 
 def resource_path(relative_path):
     try:
@@ -150,11 +150,11 @@ def recover_metadata(file_path):
 
     return metadata
 
-def download_as_mp3(youtube_url, library_dir, task_id):
+def download_as_mp3(youtube_url, library_dir, title, tracktitle, index):
 
     ydl_opts = {
         'format': 'bestaudio/best',
-        'outtmpl': os.path.join(library_dir, '%(title)s/1 %(title)s.%(ext)s'),
+        'outtmpl': os.path.join(library_dir, f'{title}/{index} {tracktitle}.%(ext)s'),
         'postprocessors': [{
             'key': 'FFmpegExtractAudio',
             'preferredcodec': 'mp3',
@@ -165,54 +165,7 @@ def download_as_mp3(youtube_url, library_dir, task_id):
     }
 
     with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-        info = ydl.extract_info(youtube_url, download=True)
-    
-    update_progress(task_id, "Download completed, converting...", 60)
-    return info['title']
-
-def download_playlist(url, library_dir, task_id, audio_format='mp3', quality='320'):
-
-    ydl_opts = {
-        'format': 'bestaudio/best',
-        'outtmpl': os.path.join(library_dir, '%(playlist_title)s/%(playlist_index)d %(title)s.%(ext)s'),
-        'ignoreerrors': True,
-        'quiet': True,
-        'postprocessors': [{
-            'key': 'FFmpegExtractAudio',
-            'preferredcodec': audio_format,
-            'preferredquality': quality,
-        }],
-        'noplaylist': False,
-    }
-
-    with YoutubeDL(ydl_opts) as ydl:
-        try:
-            update_progress(task_id, "Getting playlist info...", 25)
-            info = ydl.extract_info(url, download=False)
-            track_count = len(info.get('entries', []))
-            update_progress(task_id, f"Starting download of {track_count} tracks", 30)
-
-            ydl.download([url])
-
-            update_progress(task_id, "Download completed, converting files...", 60)
-            
-        except Exception as e:
-            print(f"Error downloading playlist: {e}")
-            update_progress(task_id, f"Download error: {str(e)}", -1)
-
-def find_matching_folder(search_title, directory):
-
-    normalized_search = search_title.lower().replace(' ', '')
-    for folder in os.listdir(directory):
-
-        if os.path.isdir(os.path.join(directory, folder)):
-
-            normalized_folder = folder.lower().replace(' ', '')
-            if normalized_folder == normalized_search:
-
-                return os.path.join(directory, folder)
-            
-    return None
+        ydl.extract_info(youtube_url, download=True)
 
 def convert_all_mp3_to_m4a(folder_path, task_id, delete_original=False):
 
@@ -251,27 +204,6 @@ def normalize(s):
     s = s.replace(" ", "")
 
     return s
-
-def find_best_metadata_file(title_folder, metadata_dir):
-
-    title_folder_norm = normalize(title_folder)
-    best_match = None
-    highest_ratio = 0
-
-    for filename in os.listdir(metadata_dir):
-        filename_norm = normalize(filename)
-        ratio = difflib.SequenceMatcher(None, title_folder_norm, filename_norm).ratio()
-        print(f"Comparing '{title_folder_norm}' with '{filename_norm}' => ratio: {ratio:.2f}")
-        if ratio > highest_ratio:
-            highest_ratio = ratio
-            best_match = filename
-
-    if best_match and (highest_ratio > 0.5 or best_match is not None):
-        print(f"Selected best match: '{best_match}' with ratio: {highest_ratio:.2f}")
-        return os.path.join(metadata_dir, best_match)
-    else:
-        print("No suitable metadata file found")
-        return None
     
 def cleanup_metadata_dir(metadata_dir):
 
@@ -287,17 +219,32 @@ def cleanup_metadata_dir(metadata_dir):
                 except Exception as e:
                     print(f"Failed to remove {filename}: {e}")
 
+def get_user_data_directory():
+
+    app_data = os.environ.get('APPDATA', os.path.expanduser('~'))
+    app_dir = os.path.join(app_data, 'iTuneUp')
+    
+    os.makedirs(app_dir, exist_ok=True)
+    return app_dir
+
 def setup_directories():
 
     if getattr(sys, 'frozen', False):
-        app_dir = os.path.dirname(sys.executable)
+        user_data_dir = get_user_data_directory()
+        metadata_dir = os.path.join(user_data_dir, "metadata")
+        library_dir = os.path.join(user_data_dir, "library")
+
+        print(f"Using user data directory: {user_data_dir}")
     else:
         app_dir = os.path.dirname(os.path.abspath(__file__))
+        metadata_dir = os.path.join(app_dir, "metadata")
+        library_dir = os.path.join(app_dir, "library")
 
-    metadata_dir = os.path.join(app_dir, "metadata")
-    library_dir = os.path.join(app_dir, "library")
     os.makedirs(metadata_dir, exist_ok=True)
     os.makedirs(library_dir, exist_ok=True)
+
+    print(f"Library directory: {library_dir}")
+    print(f"Metadata directory: {metadata_dir}")
 
     return metadata_dir, library_dir
 
@@ -385,94 +332,73 @@ def download_with_progress(current_search, task_id):
 
         title, artist = ExtractMetadata(url, id, metadata_dir)
 
-        title = title.replace(" - Single", "").strip()
+        filecount = 0
 
-        title_query = title.replace(' ', '+').replace("'", '%27')
-        artist_query = artist.replace(' ', '+').replace("'", '%27')
-
-        url = f"https://www.youtube.com/results?search_query={title_query}+{artist_query}"
+        for filename in os.listdir(metadata_dir):
+            if filename.endswith('.txt'):
+                filecount += 1
 
         update_progress(task_id, "Searching for content...", 20)
 
-        options = webdriver.ChromeOptions()
-        options.add_argument("--headless")
-        service = Service(log_path=os.devnull)
+        if filecount > 1:
 
-        driver = webdriver.Chrome(options=options, service=service)
-        driver.get(url)
-
-        try:
-
-            album_playlist = driver.find_element(By.CSS_SELECTOR, '.yt-simple-endpoint.style-scope.ytd-watch-card-rich-header-renderer')
-            playlist_url = album_playlist.get_attribute('href')
-
-        except NoSuchElementException:
-            playlist_url = None
-
-            songs = driver.find_elements(By.CSS_SELECTOR, '.style-scope.ytd-video-renderer')
-
-        if playlist_url:
-
-            update_progress(task_id, "Downloading album...", 30)
-
-            print(f"Downloading playlist from: {playlist_url}")
-            download_playlist(playlist_url, library_dir, task_id)
-
-            matched_folder = find_matching_folder(title, library_dir)
-            file_count = len([f for f in os.listdir(matched_folder) if os.path.isfile(os.path.join(matched_folder, f))])
-
-            update_progress(task_id, "Converting files...", 60)
-            convert_all_mp3_to_m4a(matched_folder, task_id, delete_original=True)
-
-            update_progress(task_id, "Adding metadata...", 80)
-            prefix = 1
             processed = 0
-            total_tracks = 0
+            update_progress(task_id, "Downloading album tracks...", 30)
+
+            albumtitle = title
 
             for filename in os.listdir(metadata_dir):
-                if filename.startswith('1'):
+                if filename.endswith('.txt'):
+
+                    index = int(filename.split('.txt')[0].split(' ')[0])
+                    title = filename.split('.txt')[0].split(' ', 1)[1]
+                    title_query = title.replace(' ', '+').replace("'", '%27')
+                    artist_query = artist.replace(' ', '+').replace("'", '%27')
+                    url = f"https://www.youtube.com/results?search_query={title_query}+{artist_query}"
+
+                    options = webdriver.ChromeOptions()
+                    options.add_argument("--headless")
+                    service = Service(log_path=os.devnull)
+
+                    driver = webdriver.Chrome(options=options, service=service)
+                    driver.get(url)
+
+                    song = driver.find_element(By.CSS_SELECTOR, '.yt-simple-endpoint.inline-block.style-scope.ytd-thumbnail').get_attribute('href')
+                    download_as_mp3(song, library_dir, albumtitle, title, index)
+                    processed += 1
+
+                    update_progress(task_id, f"Downloaded {processed}/{filecount} tracks", int(30 + (processed / filecount * 30)))
+
+            driver.quit()
+
+            update_progress(task_id, "Converting files to M4A...", 60)
+            album_folder = os.path.join(library_dir, albumtitle)
+
+            convert_all_mp3_to_m4a(album_folder, task_id, delete_original=True)
+
+            update_progress(task_id, "Adding metadata...", 80)
+
+            prefix = 1
+            for filename in os.listdir(metadata_dir):
+                if filename.startswith(str(prefix)):
+
                     metadata_filepath = os.path.join(metadata_dir, filename)
-                    temp_metadata = recover_metadata(metadata_filepath)
-                    total_tracks = int(temp_metadata.get("TOTALTRACKS", 0))
-                    break
+                    metadata = recover_metadata(metadata_filepath)
 
-            while processed < file_count:
+                    artists = metadata.get("ARTISTS")
+                    if artists is None:
+                        artists_list = []
+                    elif isinstance(artists, list):
+                        artists_list = artists
+                    else:
+                        artists_list = [artists]
 
-                metadata_filepath = None
-                for filename in os.listdir(metadata_dir):
-                    if filename.startswith(str(prefix)):
-                        metadata_filepath = os.path.join(metadata_dir, filename)
-                        break
+                    song_filepath = os.path.join(album_folder, filename.split('.txt')[0] + '.m4a')
 
-                if metadata_filepath is None:
-                    prefix += 1
-                    continue
-
-                metadata = recover_metadata(metadata_filepath)
-
-                artists = metadata.get("ARTISTS")
-                if artists is None:
-                    artists_list = []
-                elif isinstance(artists, list):
-                    artists_list = artists
-                else:
-                    artists_list = [artists]
-
-                music_file_found = False
-
-                for filename in os.listdir(matched_folder):
-                    if filename.startswith(str(prefix)):
-                        music_filepath = os.path.join(matched_folder, filename)
-                        new_music_filepath = os.path.join(
-                            matched_folder,
-                            os.path.splitext(os.path.basename(metadata_filepath))[0] + os.path.splitext(music_filepath)[1]
-                        )
-                        if music_filepath != new_music_filepath:
-                            os.rename(music_filepath, new_music_filepath)
-                            music_filepath = new_music_filepath
+                    if os.path.exists(song_filepath):
 
                         add_metadata(
-                            music_filepath,
+                            song_filepath,
                             os.path.join(metadata_dir, 'artwork.jpg'),
                             artists_list,
                             metadata.get("ALBUM"),
@@ -497,56 +423,51 @@ def download_with_progress(current_search, task_id):
                             metadata.get("TRACK"),
                             metadata.get("YEAR")
                         )
-                        processed += 1
-                        music_file_found = True
-                        break
 
-                if not music_file_found:
-                    prefix += 1
-                    continue        
-                
+                    else:
+                        print(f"Music file not found for metadata: {filename}")
+                        continue
+
                 prefix += 1
 
-                if processed >= total_tracks:
-                    break
-
-            print(f"Processed {processed} tracks out of {total_tracks} expected. Deleting remaining files...")
-            remaining_prefix = processed + 1
-            while True:
-                files_deleted = False
-                for filename in os.listdir(matched_folder):
-                    if filename.startswith(str(remaining_prefix)) and filename.lower().endswith(('.m4a', '.mp3')):
-                        file_path = os.path.join(matched_folder, filename)
-                        try:
-                            os.remove(file_path)
-                            print(f"Deleted extra track: {filename}")
-                            files_deleted = True
-                        except Exception as e:
-                            print(f"Failed to delete {filename}: {e}")
-                
-                if not files_deleted:
-                    break
-                remaining_prefix += 1
-                        
         else:
 
             update_progress(task_id, "Downloading single track...", 30)
-            song = songs[0].find_element(By.CSS_SELECTOR, '.yt-simple-endpoint.style-scope.ytd-video-renderer')
-            song_url = song.get_attribute('href')
 
-            print(f"Downloading song from: {song_url}")
-            title_folder = download_as_mp3(song_url, library_dir, task_id)
-            matched_folder = find_matching_folder(title_folder, library_dir)
+            albumtitle = title
+            
+            for filename in os.listdir(metadata_dir):
+                if filename.endswith('.txt'):
+
+                    title = filename.split('.txt')[0].split(' ', 1)[1]
+                    title_query = title.replace(' ', '+').replace("'", '%27')
+                    artist_query = artist.replace(' ', '+').replace("'", '%27')
+                    url = f"https://www.youtube.com/results?search_query={title_query}+{artist_query}"
+
+                    options = webdriver.ChromeOptions()
+                    options.add_argument("--headless")
+                    service = Service(log_path=os.devnull)
+
+                    driver = webdriver.Chrome(options=options, service=service)
+                    driver.get(url)
+
+                    song = driver.find_element(By.CSS_SELECTOR, '.yt-simple-endpoint.inline-block.style-scope.ytd-thumbnail').get_attribute('href')
+                    download_as_mp3(song, library_dir, albumtitle, title, 1)
+
+            driver.quit()
+
+            album_folder = os.path.join(library_dir, albumtitle)
             update_progress(task_id, "Converting to M4A...", 60)
-            convert_all_mp3_to_m4a(matched_folder, task_id, delete_original=True)
+            convert_all_mp3_to_m4a(album_folder, task_id, delete_original=True)
 
             update_progress(task_id, "Adding metadata...", 80)
 
-            metadata_filepath = None
-            metadata_filepath = find_best_metadata_file(title_folder, metadata_dir)
+            for filename in os.listdir(metadata_dir):
+                if filename.endswith('.txt'):
+                    metadata_filepath = os.path.join(metadata_dir, filename)
+                    music_filepath = os.path.join(album_folder, filename.split('.txt')[0] + '.m4a')
 
             metadata = recover_metadata(metadata_filepath)
-            filename = os.listdir(matched_folder)[0]
 
             artists = metadata.get("ARTISTS")
             if artists is None:
@@ -555,15 +476,6 @@ def download_with_progress(current_search, task_id):
                 artists_list = artists
             else:
                 artists_list = [artists]
-
-            music_filepath = os.path.join(matched_folder, filename)
-            new_music_filepath = os.path.join(
-                matched_folder,
-                os.path.splitext(os.path.basename(metadata_filepath))[0] + os.path.splitext(music_filepath)[1]
-            )
-            if music_filepath != new_music_filepath:
-                os.rename(music_filepath, new_music_filepath)
-                music_filepath = new_music_filepath
 
             add_metadata(
                 music_filepath,
@@ -591,29 +503,7 @@ def download_with_progress(current_search, task_id):
                 metadata.get("TRACK"),
                 metadata.get("YEAR")
             )
-
-        first_song = None
-        for f in os.listdir(matched_folder):
-            if f.lower().endswith(('.m4a')):
-                first_song = os.path.join(matched_folder, f)
-                break
-
-        if first_song:
-            audio = MP4(first_song)
-            album_tag = audio.tags.get('\xa9alb')
-            if album_tag and album_tag[0]:
-                album_name = album_tag[0]
-
-                safe_album_name = re.sub(r'[\\/:*?"<>|]', '', album_name).strip()
-                parent_dir = os.path.dirname(matched_folder)
-                new_folder_path = os.path.join(parent_dir, safe_album_name)
-                if not os.path.exists(new_folder_path):
-                    os.rename(matched_folder, new_folder_path)
-                    print(f"Renamed folder to: {safe_album_name}")
-                else:
-                    print(f"Folder '{safe_album_name}' already exists, not renamed.")
-
-        
+     
         update_progress(task_id, "Cleaning up...", 95)
         cleanup_metadata_dir(metadata_dir)
 
@@ -651,11 +541,13 @@ def calculate_album_duration(folder_path):
 def scan_library():
 
     if getattr(sys, 'frozen', False):
-        app_dir = os.path.dirname(sys.executable)
-    else:
-        app_dir = os.path.dirname(os.path.abspath(__file__))
 
-    library_dir = os.path.join(app_dir, "library")
+        user_data_dir = get_user_data_directory()
+        library_dir = os.path.join(user_data_dir, "library")
+    else:
+
+        app_dir = os.path.dirname(os.path.abspath(__file__))
+        library_dir = os.path.join(app_dir, "library")
 
     if not os.path.exists(library_dir):
         print("Library directory does not exist.")
@@ -731,11 +623,13 @@ def library():
 def album_cover(album_folder):
 
     if getattr(sys, 'frozen', False):
-        app_dir = os.path.dirname(sys.executable)
+
+        user_data_dir = get_user_data_directory()
+        library_dir = os.path.join(user_data_dir, "library")
     else:
         app_dir = os.path.dirname(os.path.abspath(__file__))
+        library_dir = os.path.join(app_dir, "library")
 
-    library_dir = os.path.join(app_dir, "library")
     folder_path = os.path.join(library_dir, album_folder)
     
     if not os.path.exists(folder_path):
@@ -892,11 +786,11 @@ def save_setting():
             return {'status': 'error', 'message': 'Key is required'}
         
         if getattr(sys, 'frozen', False):
-            app_dir = os.path.dirname(sys.executable)
+            user_data_dir = get_user_data_directory()
+            settings_file = os.path.join(user_data_dir, 'user_settings.json')
         else:
             app_dir = os.path.dirname(os.path.abspath(__file__))
-        
-        settings_file = os.path.join(app_dir, 'user_settings.json')
+            settings_file = os.path.join(app_dir, 'user_settings.json')
         
         settings = {}
         if os.path.exists(settings_file):
@@ -919,11 +813,11 @@ def save_setting():
 def load_settings():
     try:
         if getattr(sys, 'frozen', False):
-            app_dir = os.path.dirname(sys.executable)
+            user_data_dir = get_user_data_directory()
+            settings_file = os.path.join(user_data_dir, 'user_settings.json')
         else:
             app_dir = os.path.dirname(os.path.abspath(__file__))
-        
-        settings_file = os.path.join(app_dir, 'user_settings.json')
+            settings_file = os.path.join(app_dir, 'user_settings.json')
 
         settings = {}
         if os.path.exists(settings_file):
