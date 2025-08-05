@@ -24,7 +24,6 @@
 - Native Windows installer with:
   * Shortcut creation
   * Uninstaller
-  * Optional installation path
 - Modern UI powered by a built-in WebView interface (no browser needed)
 
 ## 📦 Technologies Used
@@ -47,7 +46,6 @@
 ## 📂 Installation & Uninstallation
 - Download `iTuneUp-Setup.exe` from the [Releases](https://github.com/kalis26/iTuneUp/releases)
 - Run the installer — you can:
-  * Choose install location
   * Add desktop/start menu shortcut
 - To uninstall, go to **Control Panel > Apps > iTuneUp**, or run `Uninstall iTuneUp` from the Start menu
 
