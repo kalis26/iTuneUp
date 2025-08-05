@@ -916,4 +916,4 @@ if __name__ == '__main__':
         shadow=True,
     )
 
-    webview.start(gui='edgechromium', debug=True, private_mode=False, storage_path=None)
+    webview.start(gui='edgechromium', debug=False, private_mode=False, storage_path=None)
