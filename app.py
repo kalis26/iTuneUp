@@ -5,14 +5,11 @@ from forms import SearchForm, ConfirmForm
 from selenium import webdriver
 from selenium.webdriver.common.by import By
 from selenium.webdriver.chrome.service import Service
-from selenium.common.exceptions import NoSuchElementException
 from mutagen.mp4 import MP4, MP4FreeForm, MP4Cover
 import yt_dlp
-from yt_dlp import YoutubeDL
 from pydub import AudioSegment
 from ammr import ExtractMetadata
 import re
-import difflib
 import threading
 import time
 import uuid
@@ -33,7 +30,7 @@ def resource_path(relative_path):
 app = Flask(__name__, template_folder=resource_path('templates'), static_folder=resource_path('static'))
 app.config['SECRET_KEY'] = secrets.token_urlsafe(32)
 
-def add_metadata(file_path, image_path, artists, album, albumartist, albumsort, artist, artistsort, compilation, copyright, 
+def add_metadata(file_path, image_path, artists, album, albumartist, albumsort, artist, artistsort, comment, compilation, copyright, 
                  discnumber, genre, itunesadvisory, itunesalbumid, itunesartistid, itunescatalogid, itunesgenreid,
                  itunesgapless, itunesmediatype, title, titlesort, totaltracks, track, year):
 
@@ -63,6 +60,8 @@ def add_metadata(file_path, image_path, artists, album, albumartist, albumsort, 
         audio["sonm"] = [titlesort]
     if year:
         audio["\xa9day"] = [year]
+    if comment:
+        audio["\xa9cmt"] = [comment]
 
     if compilation is not None:
         try:
@@ -135,18 +134,33 @@ def add_metadata(file_path, image_path, artists, album, albumartist, albumsort, 
 def recover_metadata(file_path):
 
     metadata = {}
+    current_key = None
+    current_value = ""
+
     with open(file_path, 'r', encoding='utf-8') as f:
-        for line in f:
-            key, value = line.strip().split('| ', 1)
-            key = key.strip()
-            value = value.strip()
-            if key in metadata:
-                if isinstance(metadata[key], list):
-                    metadata[key].append(value)
-                else:
-                    metadata[key] = [metadata[key], value]
+        lines = f.readlines()
+    
+    for line in lines:
+        line = line.rstrip('\n\r')
+
+        if ' | ' in line and not line.startswith(' '):
+
+            if current_key:
+                metadata[current_key] = current_value.strip()
+            
+            parts = line.split(' | ', 1)
+            if len(parts) == 2:
+                current_key = parts[0].strip()
+                current_value = parts[1]
             else:
-                metadata[key] = value
+                current_key = None
+                current_value = ""
+        else:
+            if current_key:
+                current_value += '\n' + line
+
+    if current_key:
+        metadata[current_key] = current_value.strip()
 
     return metadata
 
@@ -378,10 +392,22 @@ def download_with_progress(current_search, task_id):
 
             update_progress(task_id, "Adding metadata...", 80)
 
-            prefix = 1
+            metadata_files = []
             for filename in os.listdir(metadata_dir):
-                if filename.startswith(str(prefix)):
+                if filename.endswith('.txt'):
+                    try:
+                        track_num = int(filename.split(' ')[0])
+                        metadata_files.append((track_num, filename))
+                    except ValueError:
+                        continue
 
+            metadata_files.sort(key=lambda x: x[0])
+
+            total_metadata_files = len(metadata_files)
+            processed = 0    
+
+            for track_num, filename in metadata_files:
+                try:
                     metadata_filepath = os.path.join(metadata_dir, filename)
                     metadata = recover_metadata(metadata_filepath)
 
@@ -406,6 +432,7 @@ def download_with_progress(current_search, task_id):
                             metadata.get("ALBUMSORT"),
                             metadata.get("ARTIST"),
                             metadata.get("ARTISTSORT"),
+                            metadata.get("COMMENT"),
                             metadata.get("COMPILATION"),
                             metadata.get("COPYRIGHT"),
                             metadata.get("DISCNUMBER"),
@@ -424,11 +451,17 @@ def download_with_progress(current_search, task_id):
                             metadata.get("YEAR")
                         )
 
-                    else:
-                        print(f"Music file not found for metadata: {filename}")
-                        continue
+                        processed += 1
+                        progress_percent = 80 + (processed / total_metadata_files * 15)
+                        update_progress(task_id, f"Applied metadata to {processed / total_metadata_files}", progress_percent)
 
-                prefix += 1
+                    else:
+                        update_progress(task_id, f'Error: Music file not found for metadata: {filename}', -1)
+
+                except Exception as e:
+                    print(f"Error processing metadata file {filename}: {str(e)}")
+                    update_progress(task_id, f'Error processing metadata file {filename}: {str(e)}', -1)
+                    continue
 
         else:
 
@@ -486,6 +519,7 @@ def download_with_progress(current_search, task_id):
                 metadata.get("ALBUMSORT"),
                 metadata.get("ARTIST"),
                 metadata.get("ARTISTSORT"),
+                metadata.get("COMMENT"),
                 metadata.get("COMPILATION"),
                 metadata.get("COPYRIGHT"),
                 metadata.get("DISCNUMBER"),

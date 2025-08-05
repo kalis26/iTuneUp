@@ -210,7 +210,17 @@ def ExtractArtists(argument, argument2):
 
     return ARTIST, ARTISTS
 
-# Function to extract the copyright & date
+# Function to extract the comment of the album (or Editor's Notes)
+
+def ExtractComment(argument):
+
+    try:
+        comment_elem = argument.find_element(By.CSS_SELECTOR, '.content.svelte-p1v1m6.with-more-button')
+        COMMENT = comment_elem.get_attribute("textContent")
+    except NoSuchElementException:
+        COMMENT = ""
+    
+    return COMMENT
 
 def ExtractCopyrightAndDate(argument):
 
@@ -258,13 +268,14 @@ def ExtractMetadata(driver, id, metadata_dir):
         driver = webdriver.Chrome(service=service, options=options)
 
     driver.get(url)
-
+    
     ALBUM = ExtractAlbumTitle(driver)
     ALBUMSORT = ALBUM
     ALBUMARTIST, ITUNESARTISTID = ExtractArtistAndID(driver)
     GENRE = ExtractGenre(driver)
     ITUNESGENREID = GenreSelection(GENRE)
     COPYRIGHT, YEAR = ExtractCopyrightAndDate(driver)
+    COMMENT = ExtractComment(driver)
 
     songs_elem = driver.find_elements(By.CLASS_NAME, 'songs-list-row')
 
@@ -290,6 +301,7 @@ def ExtractMetadata(driver, id, metadata_dir):
             if ARTISTS:
                 for artists in ARTISTS:
                     print('ARTISTS         | ', artists, file=f)
+            print('COMMENT         | ', COMMENT, file=f)
             print('COMPILATION     | ', COMPILATION, file=f)
             print('COPYRIGHT       | ', COPYRIGHT, file=f)
             print('DISCNUMBER      | ', DISCNUMBER, file=f)
@@ -308,12 +320,8 @@ def ExtractMetadata(driver, id, metadata_dir):
             print("TRACK           | ", TRACKNUMBER, file=f)
             print("YEAR            | ", YEAR, file=f)
 
-        # Find the <source> element with type="image/jpeg"
-
         source_elem = driver.find_element(By.CSS_SELECTOR, 'source[type="image/jpeg"]')
         srcset = source_elem.get_attribute("srcset")
-
-        # Extract the last URL before '632w'
 
         urls = re.findall(r'(https?://[^\s,]+)\s+\d+w', srcset)
         if urls:
