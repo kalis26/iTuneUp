@@ -17,6 +17,7 @@
 
 build/
 setup/
+ffmpeg/
 
 # User-specific files (MonoDevelop/Xamarin Studio)
 *.userprefs
