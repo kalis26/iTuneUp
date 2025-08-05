@@ -19,27 +19,6 @@ import webview
 import json
 import subprocess
 import platform
-import atexit
-import signal
-
-def cleanup_chrome_processes():
-    try:
-        if platform.system() == 'Windows':
-            subprocess.run(['taskkill', '/f', '/im', 'chromedriver.exe'], 
-                         capture_output=True, check=False)
-    except:
-        pass
-
-atexit.register(cleanup_chrome_processes)
-
-def signal_handler(signum, frame):
-    try:
-        cleanup_chrome_processes()
-    except:
-        pass
-    sys.exit(0)
-
-signal.signal(signal.SIGTERM, signal_handler)
 
 def resource_path(relative_path):
     try:
@@ -938,20 +917,15 @@ if __name__ == '__main__':
     
     threading.Thread(target=run_flask, daemon=True).start()
 
-    try:
-        window = webview.create_window(
-            "iTuneUp",
-            "http://127.0.0.1:5000",
-            width=1440,
-            height=820,
-            resizable=True,
-            frameless=True,
-            on_top=False,
-            shadow=True,
-        )
+    window = webview.create_window(
+        "iTuneUp",
+        "http://127.0.0.1:5000",
+        width=1440,
+        height=820,
+        resizable=True,
+        frameless=True,
+        on_top=False,
+        shadow=True,
+    )
 
-        webview.start(gui='edgechromium', debug=False, private_mode=False, storage_path=None)
-    except KeyboardInterrupt:
-        pass
-    finally:
-        cleanup_chrome_processes()
+    webview.start(gui='edgechromium', debug=False, private_mode=False, storage_path=None)
