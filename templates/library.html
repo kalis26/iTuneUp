@@ -9,6 +9,16 @@
         {% if albums %}
 
             <div class="library-content">
+                <div class="access-btn">
+                    <button class="open-folder-btn" onclick="openLibraryFolder()">
+                        <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+                            <path d="M14.5 3.5H7.71L6.21 2H1.5C0.95 2 0.5 2.45 0.5 3V13C0.5 13.55 0.95 14 1.5 14H14.5C15.05 14 15.5 13.55 15.5 13V4.5C15.5 3.95 15.05 3.5 14.5 3.5Z" fill="currentColor"/>
+                            <path d="M10 8L12 10L10 12" stroke="white" stroke-width="1" stroke-linecap="round" stroke-linejoin="round"/>
+                        </svg>
+                        Open Library Folder
+                    </button>
+                </div>
+
                 <div class="albums-grid" id="albumsGrid">
                     {% for album in albums %}
                         <div class="album-box" data-album-index="{{ loop.index0 }}" onclick="toggleAlbumDetails('{{ loop.index0 }}')">

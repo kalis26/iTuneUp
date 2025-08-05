@@ -1,6 +1,6 @@
 import os
 import sys
-from flask import Flask, render_template, request, flash, session
+from flask import Flask, render_template, request, flash, session, jsonify
 from forms import SearchForm, ConfirmForm
 from selenium import webdriver
 from selenium.webdriver.common.by import By
@@ -17,7 +17,8 @@ import secrets
 import threading
 import webview
 import json
-from pathlib import Path
+import subprocess
+import platform
 
 def resource_path(relative_path):
     try:
@@ -235,7 +236,7 @@ def cleanup_metadata_dir(metadata_dir):
 
 def get_user_data_directory():
 
-    app_data = os.environ.get('APPDATA', os.path.expanduser('~'))
+    app_data = os.environ.get('LOCALAPPDATA', os.path.expanduser('~'), 'AppData', 'Local')
     app_dir = os.path.join(app_data, 'iTuneUp')
     
     os.makedirs(app_dir, exist_ok=True)
@@ -864,6 +865,28 @@ def load_settings():
         return {'status': 'success', 'settings': settings}
     except Exception as e:
         return {'status': 'error', 'message': str(e), 'settings': {}}
+    
+@app.route('/open-library-folder', methods=['POST'])
+def open_library_folder():
+    try:
+        if getattr(sys, 'frozen', False):
+            user_data_dir = get_user_data_directory()
+            library_path = os.path.join(user_data_dir, "library")
+        else:
+            app_dir = os.path.dirname(os.path.abspath(__file__))
+            library_path = os.path.join(app_dir, "library")
+        
+        if not os.path.exists(library_path):
+            os.makedirs(library_path, exist_ok=True)
+        
+        if platform.system() == 'Windows':
+            subprocess.run(['explorer', library_path], check=True)
+            return jsonify({'success': True})
+        else:
+            return jsonify({'success': False, 'error': 'Unsupported operating system'})
+            
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)})
 
 def run_flask():
     app.run(host='127.0.0.1', port=5000, debug=False)
@@ -893,4 +916,4 @@ if __name__ == '__main__':
         shadow=True,
     )
 
-    webview.start(gui='edgechromium', debug=False, private_mode=False, storage_path=None)
+    webview.start(gui='edgechromium', debug=True, private_mode=False, storage_path=None)

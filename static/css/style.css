@@ -1589,3 +1589,28 @@ body.flash-active > *:not(.flash-overlay) {
 .btn-confirm:hover {
     background: #D70015;
 }
+
+.open-folder-btn {
+    display: flex;
+    align-items: flex-start;
+    gap: 8px;
+    padding: 10px 16px;
+    background: #007AFF;
+    color: white;
+    border: none;
+    border-radius: 20px;
+    font-size: 14px;
+    font-family: 'SF UI Text Regular';
+    transition: background-color 0.2s;
+    cursor: pointer;
+    margin-left: 20px;
+    width: 200px;
+}
+
+.open-folder-btn:hover {
+    background: #0056CC;
+}
+
+.open-folder-btn svg {
+    flex-shrink: 0;
+}

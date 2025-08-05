@@ -375,3 +375,21 @@ document.addEventListener('keydown', function(event) {
         closeFlash();
     }
 });
+
+function openLibraryFolder() {
+    fetch('/open-library-folder', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        }
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (!data.success) {
+            console.error('Failed to open library folder:', data.error);
+        }
+    })
+    .catch(error => {
+        console.error('Error opening library folder:', error);
+    });
+}
