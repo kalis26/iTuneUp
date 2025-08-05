@@ -224,17 +224,6 @@ def convert_all_mp3_to_m4a(folder_path, task_id, delete_original=False):
         except Exception as e:
             print(f"Failed to convert {filename}: {e}")
             converted_count += 1
-        
-
-def normalize(s):
-
-    s = s.lower()
-    for word in ["(clipofficiel)", "(officialvideo)", "(officialaudio)", "(visualizer)"]:
-        s = s.replace(word, "")
-    s = re.sub(r"[.,\-’']", "", s)
-    s = s.replace(" ", "")
-
-    return s
     
 def cleanup_metadata_dir(metadata_dir):
 
@@ -252,7 +241,7 @@ def cleanup_metadata_dir(metadata_dir):
 
 def get_user_data_directory():
 
-    app_data = os.environ.get('LOCALAPPDATA', os.path.expanduser('~'), 'AppData', 'Local')
+    app_data = os.environ.get('LOCALAPPDATA', os.path.join(os.path.expanduser('~'), 'AppData', 'Local'))
     app_dir = os.path.join(app_data, 'iTuneUp')
     
     os.makedirs(app_dir, exist_ok=True)
@@ -469,7 +458,7 @@ def download_with_progress(current_search, task_id):
 
                         processed += 1
                         progress_percent = 80 + (processed / total_metadata_files * 15)
-                        update_progress(task_id, f"Applied metadata to {processed / total_metadata_files}", progress_percent)
+                        update_progress(task_id, f"Applied metadata to {processed}/{total_metadata_files}", progress_percent)
 
                     else:
                         update_progress(task_id, f'Error: Music file not found for metadata: {filename}', -1)
