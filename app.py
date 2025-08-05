@@ -25,8 +25,6 @@ import signal
 def cleanup_chrome_processes():
     try:
         if platform.system() == 'Windows':
-            subprocess.run(['taskkill', '/f', '/im', 'chrome.exe'], 
-                         capture_output=True, check=False)
             subprocess.run(['taskkill', '/f', '/im', 'chromedriver.exe'], 
                          capture_output=True, check=False)
     except:
@@ -35,10 +33,12 @@ def cleanup_chrome_processes():
 atexit.register(cleanup_chrome_processes)
 
 def signal_handler(signum, frame):
-    cleanup_chrome_processes()
+    try:
+        cleanup_chrome_processes()
+    except:
+        pass
     sys.exit(0)
 
-signal.signal(signal.SIGINT, signal_handler)
 signal.signal(signal.SIGTERM, signal_handler)
 
 def resource_path(relative_path):
@@ -48,6 +48,22 @@ def resource_path(relative_path):
         base_path = os.path.abspath(".")
 
     return os.path.join(base_path, relative_path)
+
+def create_safe_driver():
+    try:
+        options = webdriver.ChromeOptions()
+        options.add_argument("--headless")
+        options.add_argument("--no-sandbox")
+        options.add_argument("--disable-dev-shm-usage")
+        options.add_experimental_option('excludeSwitches', ['enable-logging'])
+        options.add_argument("--log-level=3")
+        service = Service(log_path=os.devnull)
+        
+        driver = webdriver.Chrome(options=options, service=service)
+        return driver
+    except Exception as e:
+        print(f"Failed to create WebDriver: {e}")
+        return None
 
 app = Flask(__name__, template_folder=resource_path('templates'), static_folder=resource_path('static'))
 app.config['SECRET_KEY'] = secrets.token_urlsafe(32)
@@ -286,10 +302,10 @@ def setup_directories():
 
 def show_search_results(form, confirm_form, title, artist, searchid):
 
-    options = webdriver.ChromeOptions()
-    options.add_argument("--headless")
-    service = Service(log_path=os.devnull)
-    driver = webdriver.Chrome(service=service, options=options)
+    driver = create_safe_driver()
+    if not driver:
+        flash('Failed to create WebDriver. Please check your Chrome installation.')
+        return render_template('home.html', form=form, confirm_form=confirm_form, active_page='Home')
 
     try:
 
@@ -392,11 +408,10 @@ def download_with_progress(current_search, task_id):
                     artist_query = artist.replace(' ', '+').replace("'", '%27')
                     url = f"https://www.youtube.com/results?search_query={title_query}+{artist_query}"
 
-                    options = webdriver.ChromeOptions()
-                    options.add_argument("--headless")
-                    service = Service(log_path=os.devnull)
-
-                    driver = webdriver.Chrome(options=options, service=service)
+                    driver = create_safe_driver()
+                    if not driver:
+                        update_progress(task_id, 'Failed to create WebDriver. Please check your Chrome installation.', -1)
+                        return
                     driver.get(url)
 
                     song = driver.find_element(By.CSS_SELECTOR, '.yt-simple-endpoint.inline-block.style-scope.ytd-thumbnail').get_attribute('href')
@@ -404,8 +419,8 @@ def download_with_progress(current_search, task_id):
                     processed += 1
 
                     update_progress(task_id, f"Downloaded {processed}/{filecount} tracks", int(30 + (processed / filecount * 30)))
-
-            driver.quit()
+                    
+                    driver.quit()
 
             update_progress(task_id, "Converting files to M4A...", 60)
             album_folder = os.path.join(library_dir, albumtitle)
@@ -499,17 +514,16 @@ def download_with_progress(current_search, task_id):
                     artist_query = artist.replace(' ', '+').replace("'", '%27')
                     url = f"https://www.youtube.com/results?search_query={title_query}+{artist_query}"
 
-                    options = webdriver.ChromeOptions()
-                    options.add_argument("--headless")
-                    service = Service(log_path=os.devnull)
-
-                    driver = webdriver.Chrome(options=options, service=service)
+                    driver = create_safe_driver()
+                    if not driver:
+                        update_progress(task_id, 'Failed to create WebDriver. Please check your Chrome installation.', -1)
+                        return
                     driver.get(url)
 
                     song = driver.find_element(By.CSS_SELECTOR, '.yt-simple-endpoint.inline-block.style-scope.ytd-thumbnail').get_attribute('href')
                     download_as_mp3(song, library_dir, albumtitle, title, 1)
 
-            driver.quit()
+                    driver.quit()
 
             album_folder = os.path.join(library_dir, albumtitle)
             update_progress(task_id, "Converting to M4A...", 60)
@@ -563,7 +577,6 @@ def download_with_progress(current_search, task_id):
         update_progress(task_id, "Cleaning up...", 95)
         cleanup_metadata_dir(metadata_dir)
 
-        driver.quit()
         update_progress(task_id, "Download completed", 100)
 
         time.sleep(30)
@@ -938,5 +951,7 @@ if __name__ == '__main__':
         )
 
         webview.start(gui='edgechromium', debug=False, private_mode=False, storage_path=None)
+    except KeyboardInterrupt:
+        pass
     finally:
         cleanup_chrome_processes()

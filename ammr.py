@@ -331,6 +331,8 @@ def ExtractMetadata(driver, id, metadata_dir):
 
             with open(image_path, 'wb') as handler:
                 handler.write(img_data)
+    
+    driver.quit()
 
     return ALBUM, ALBUMARTIST
 
