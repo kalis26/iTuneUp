@@ -36,7 +36,7 @@
 
 ## 🖥️ System Requirements
 - **Operating System:** Windows 10 (64 bits) or later
-- **Disk Space:** ~150 MB (excluding downloaded music)
+- **Disk Space:** ~510 MB (excluding downloaded music)
 - **Internet Access:** Required for metadata & download
 - **Google Chrome:** Required for Apple Music scraping
 ```
