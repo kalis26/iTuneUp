@@ -1,0 +1,81 @@
+{% extends 'nav.html' %}
+
+{% block title %}Home - iTuneUp{% endblock %}
+
+{% block content %}
+
+    <h1>Welcome to iTuneUp</h1>
+    <h3>Search for your desired song or album</h3>
+    
+    <div class="form-container">
+        <form action="" method="post" novalidate>
+            {{ form.hidden_tag() }}
+            <p>
+                <div class="input-container" id="top-container">
+                    {{form.album(class="form-input", size=30, id="album")}}
+                    <span class="clear-btn" onclick="document.getElementById('album').value = '';">
+                        <img src="{{ url_for('static', filename='images/clear.png') }}" alt="Clear">
+                    </span>
+                </div>
+            </p>
+            <p>
+                <div class="input-container">
+                    {{form.artist(class="form-input", size=30, id="artist")}}
+                    <span class="clear-btn" onclick="document.getElementById('artist').value = '';">
+                        <img src="{{ url_for('static', filename='images/clear.png') }}" alt="Clear">
+                    </span>
+                </div>
+            </p>
+
+            {% if not Name %}
+                <!-- Show search button when no results -->
+                <p>
+                    <div class="form-button-container">
+                        {{form.search(class="form-button", id="search-btn")}}
+                        <img src="{{ url_for('static', filename='images/loading.gif') }}" alt="Loading Gif" class="loading-gif" id="loading-gif">
+                    </div>
+                </p>
+            {% endif %}
+
+            {% if Name and Details %}
+                <!-- Show search results -->
+                <p>
+                    <div class="search-result-container">
+                        <div class="search-result">
+                            <p>Did you search for</p>
+                            <div class="search-result-info">
+                                <img src="{{ IMG }}" alt="Search Result Image" class="search-result-img">
+                                <div class="text-container">
+                                    <p class="search-result-text" id="text1">{{ Name }}</p>
+                                    <p class="search-result-text" id="text2">{{ Details }}</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </p>
+
+                <!-- Show Yes/No buttons -->
+                <form action="" method="post" class="confirm-form" novalidate id="confirm-form">
+                    {{ confirm_form.hidden_tag() }}
+                    <p>
+                        <div class="confirm-buttons-container">
+                            <div class="yes-button-container">
+                                {{ confirm_form.yes(class="confirm-button yes-button", id="yes-btn") }}
+                            </div>
+                            <div class="no-button-container">
+                                {{ confirm_form.no(class="confirm-button no-button", id="no-btn") }}
+                                <img src="{{ url_for('static', filename='images/loading.gif') }}" alt="Loading Gif" class="loading-gif" id="no-loading-gif">
+                            </div>                   
+                        </div>
+                    </p>
+            {% endif %}
+        </form>
+    </div>
+
+{% endblock %}
+
+{% block scripts %}
+
+<script src="{{ url_for('static', filename='js/main.js') }}"></script>
+
+{% endblock %}

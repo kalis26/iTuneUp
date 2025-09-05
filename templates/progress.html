@@ -1,0 +1,79 @@
+{% extends 'nav.html' %}
+
+{% block title %}Download Progress - iTuneUp{% endblock %}
+
+{% block content %}
+
+    <div class="progress-container" id="task-container" data-task-id="{{ task_id }}">
+        <h1 class="progress-title">Download in Progress</h1>
+
+        <div class="progress-wrapper">
+            <div class="progress-bar-container">
+                <div class="progress-bar" id="progressBar">
+                    <div class="progress-fill" id="progressFill"></div>
+                </div>
+                <div class="progress-text" id="progressText">0%</div>
+            </div>
+            <div class="progress-message" id="progressMessage">Starting download...</div>
+        </div>
+
+        <div class="progress-note">
+            <strong>Note:</strong> Downloading albums may take up to 10 minutes depending on the number of tracks. Do not return to home when downloading or if it looks stuck.
+        </div>
+    </div>
+
+{% endblock %}
+
+{% block scripts %}
+
+<script src="{{ url_for('static', filename='js/main.js') }}"></script>
+<script>
+
+const taskID = '{{ task_id }}';
+const interval = setInterval(updateProgress, 3000);
+let lastMessage = '';
+let lastPercentage = -1;
+
+function updateProgress() {
+
+    console.log('Checking progress for task:', taskID);
+
+    fetch(`/progress/${taskID}`)
+        .then(response => response.json())
+        .then(data => {
+
+            console.log('Progress data:', data);
+
+            if (data.message !== lastMessage) {
+                document.getElementById('progressMessage').textContent = data.message;
+                lastMessage = data.message;
+            }
+            
+            if (data.percentage !== null && data.percentage !== lastPercentage) {
+                document.getElementById('progressFill').style.width = data.percentage + '%';
+                lastPercentage = data.percentage;
+            }
+            
+            if (data.percentage === 100) {
+                clearInterval(interval);
+                setTimeout(() => {
+                    window.location.href = '/?download=success';
+                }, 2000);
+            }
+
+            if (data.percentage === -1) {
+                clearInterval(interval);
+                document.getElementById('progressMessage').textContent = 'Download failed: ' + data.message;
+            }
+        })
+        .catch(error => {
+            console.error('Error fetching progress:', error);
+            document.getElementById('progressMessage').textContent = 'Connection error - retrying...'
+        });
+}
+
+updateProgress();
+
+</script>
+
+{% endblock %}
