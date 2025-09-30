@@ -195,8 +195,11 @@ def download_as_mp3(youtube_url, library_dir, title, tracktitle, index):
         'noplaylist': True,
     }
 
-    with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-        ydl.extract_info(youtube_url, download=True)
+    try:
+        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+            ydl.extract_info(youtube_url, download=True)
+    except Exception as e:
+        print(f"yt-dlp error: {e}")
 
 def convert_all_mp3_to_m4a(folder_path, task_id, delete_original=False):
 
@@ -372,7 +375,7 @@ def download_with_progress(current_search, task_id):
 
                     index = int(filename.split('.txt')[0].split(' ')[0])
                     title = filename.split('.txt')[0].split(' ', 1)[1]
-                    title_query = title.replace(' ', '+').replace("'", '%27')
+                    title_query = title.replace(' ', '+').replace("'", '%27').replace('_', '?')
                     artist_query = artist.replace(' ', '+').replace("'", '%27')
                     url = f"https://www.youtube.com/results?search_query={title_query}+{artist_query}"
 
@@ -391,6 +394,8 @@ def download_with_progress(current_search, task_id):
                             noclip = todlsong
                             break
                     song = noclip.get_attribute('href')
+                    if not song.startswith('http'):
+                        song = 'https://www.youtube.com' + song
                     download_as_mp3(song, library_dir, albumtitle, title, index)
                     processed += 1
 
@@ -486,7 +491,7 @@ def download_with_progress(current_search, task_id):
                 if filename.endswith('.txt'):
 
                     title = filename.split('.txt')[0].split(' ', 1)[1]
-                    title_query = title.replace(' ', '+').replace("'", '%27')
+                    title_query = title.replace(' ', '+').replace("'", '%27').replace('_', '?')
                     artist_query = artist.replace(' ', '+').replace("'", '%27')
                     url = f"https://www.youtube.com/results?search_query={title_query}+{artist_query}"
 
@@ -504,6 +509,8 @@ def download_with_progress(current_search, task_id):
                             noclip = todlsong
                             break
                     song = noclip.get_attribute('href')
+                    if not song.startswith('http'):
+                        song = 'https://www.youtube.com' + song
                     download_as_mp3(song, library_dir, albumtitle, title, 1)
 
                     driver.quit()

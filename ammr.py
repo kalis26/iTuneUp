@@ -270,6 +270,7 @@ def ExtractMetadata(driver, id, metadata_dir):
     driver.get(url)
     
     ALBUM = ExtractAlbumTitle(driver)
+    ALBUM.replace('?', '_').replace('.', '@')
     ALBUMSORT = ALBUM
     ALBUMARTIST, ITUNESARTISTID = ExtractArtistAndID(driver)
     GENRE = ExtractGenre(driver)
@@ -285,6 +286,7 @@ def ExtractMetadata(driver, id, metadata_dir):
 
         ITUNESCATALOGID = ExtractCatalogID(song)
         TITLE = ExtractSongTitle(song)
+        TITLE = TITLE.replace('?', '_')    
         TITLESORT = TITLE
         TRACKNUMBER = ExtractTrackNumber(song)
         ITUNESADVISORY = ExtractItunesAdvisory(song)
@@ -293,7 +295,7 @@ def ExtractMetadata(driver, id, metadata_dir):
 
         FILENAME = os.path.join(metadata_dir, TRACKNUMBER + " " + TITLE + ".txt")
         with open(FILENAME, "w", encoding="utf-8") as f:
-            print("ALBUM           | ", ALBUM, file=f)
+            print("ALBUM           | ", ALBUM.replace('@', '.').replace('_', '?'), file=f)
             print("ALBUMARTIST     | ", ALBUMARTIST, file=f)
             print('ALBUMSORT       | ', ALBUMSORT, file=f)
             print('ARTIST          | ', ARTIST, file=f)
@@ -313,7 +315,7 @@ def ExtractMetadata(driver, id, metadata_dir):
             print('ITUNESGENREID   | ', ITUNESGENREID, file=f)
             print('ITUNESGAPLESS   | ', ITUNESGAPLESS, file=f)
             print('ITUNESMEDIATYPE | ', ITUNESMEDIATYPE, file=f)
-            print("TITLE           | ", TITLE, file=f)
+            print("TITLE           | ", TITLE.replace('_', '?'), file=f)
             print("TITLESORT       | ", TITLESORT, file=f)
             print("TOTALDISCS      | ", TOTALDISCS, file=f)
             print("TOTALTRACKS     | ", TOTALTRACKS, file=f)
