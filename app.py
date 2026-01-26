@@ -5,6 +5,7 @@ from forms import SearchForm, ConfirmForm
 from selenium import webdriver
 from selenium.webdriver.common.by import By
 from selenium.webdriver.chrome.service import Service
+from selenium.common.exceptions import NoSuchElementException
 from mutagen.mp4 import MP4, MP4FreeForm, MP4Cover
 import yt_dlp
 from pydub import AudioSegment
@@ -19,6 +20,18 @@ import webview
 import json
 import subprocess
 import platform
+
+
+def sanitize_filename(filename):
+    """Remove or replace characters that are invalid in Windows filenames."""
+    # Windows invalid characters: \ / : * ? " < > |
+    invalid_chars = ['\\', '/', ':', '*', '?', '"', '<', '>', '|']
+    for char in invalid_chars:
+        filename = filename.replace(char, '_')
+    # Also strip leading/trailing spaces and dots
+    filename = filename.strip(' .')
+    return filename
+
 
 def resource_path(relative_path):
     try:
@@ -283,7 +296,10 @@ def show_search_results(form, confirm_form, title, artist, searchid):
         urlApple = f"https://music.apple.com/us/search?term={title.replace(' ', '%20')}%20{artist.replace(' ', '%20')}"
         driver.get(urlApple)
 
-        grid_elem = driver.find_elements(By.CSS_SELECTOR, '.grid-item.svelte-1a54yxp')
+        grid_elem = driver.find_elements(
+            By.CSS_SELECTOR,
+            '[data-testid="grid-item"]'
+        )
 
         if not grid_elem:
             flash('No search results found.')
@@ -296,34 +312,65 @@ def show_search_results(form, confirm_form, title, artist, searchid):
         current_element = grid_elem[searchid]
         
         try:
-            Name = current_element.find_element(By.CSS_SELECTOR, '.top-search-lockup__primary__title.svelte-bg2ql4[dir="auto"]').get_attribute("textContent").strip()
-            Details = current_element.find_element(By.CSS_SELECTOR, '.top-search-lockup__secondary.svelte-bg2ql4[data-testid="top-search-result-subtitle"]').get_attribute("textContent").strip()
+            Name_elem = current_element.find_element(
+                By.CSS_SELECTOR,
+                '[data-testid="top-search-result-title"] span[dir="auto"]'
+            )
+            Name = Name_elem.text.strip()
+        except NoSuchElementException:
+            flash('Could not find the Name element!')
+            Name = None
 
-            IMG = current_element.find_element(By.CSS_SELECTOR, '.svelte-uduhys')
-            IMGCON = IMG.find_element(By.CSS_SELECTOR, 'source')
-            srcset = IMGCON.get_attribute("srcset")
+        try:
+            Details_elem = current_element.find_element(
+                By.CSS_SELECTOR,
+                '[data-testid="top-search-result-subtitle"]'
+            )
+            Details = Details_elem.text.strip()
+        except NoSuchElementException:
+            flash('Could not find the Details element!')
+            Details = None
+
+        imgurl = None
+        try:
+            # Try the first <source> element in <picture>
+            source_elem = current_element.find_element(
+                By.CSS_SELECTOR,
+                '[data-testid="artwork-component"] picture source'
+            )
+            srcset = source_elem.get_attribute("srcset")
+            # Pick second URL if available (higher resolution)
             imgurl = srcset.split(',')[1].split(' ')[0].strip()
+        except NoSuchElementException:
+            try:
+                # Fallback: pick the <img> src if <source> is missing
+                img_elem = current_element.find_element(
+                    By.CSS_SELECTOR,
+                    '[data-testid="artwork-component"] picture img'
+                )
+                imgurl = img_elem.get_attribute("src")
+            except NoSuchElementException:
+                # Still nothing found: warn but continue
+                flash('Could not find the artwork image.')
+                imgurl = None
 
-            session['current_search'] = {
-                'name': Name,
-                'details': Details,
-                'img': imgurl,
-                'title': title,
-                'artist': artist,
-                'id': searchid,
-                'total_results': len(grid_elem)
-            }
 
-            return render_template('home.html', form=form, confirm_form=confirm_form, active_page='Home', 
+        session['current_search'] = {
+            'name': Name,
+            'details': Details,
+            'img': imgurl,
+            'title': title,
+            'artist': artist,
+            'id': searchid,
+            'total_results': len(grid_elem)
+        }
+
+        return render_template('home.html', form=form, confirm_form=confirm_form, active_page='Home', 
                                  Name=Name, Details=Details, IMG=imgurl)
                                  
-        except Exception as e:
+    except Exception as e:
             flash(f'Error extracting search result: {str(e)}')
             return render_template('home.html', form=form, confirm_form=confirm_form, active_page='Home')
-
-    except Exception as e:
-        flash(f'Error during search: {str(e)}')
-        return render_template('home.html', form=form, confirm_form=confirm_form, active_page='Home')
     
     finally:
         driver.quit()
@@ -353,7 +400,11 @@ def download_with_progress(current_search, task_id):
         metadata_dir, library_dir = setup_directories()
         update_progress(task_id, "Setting up directories...", 10)
 
+        print(f"Searching for: {title} by {artist}")
+
         title, artist = ExtractMetadata(url, id, metadata_dir)
+
+        print(f"Extracted metadata - Title: {title}, Artist: {artist}")
 
         filecount = 0
 
@@ -375,6 +426,8 @@ def download_with_progress(current_search, task_id):
 
                     index = int(filename.split('.txt')[0].split(' ')[0])
                     title = filename.split('.txt')[0].split(' ', 1)[1]
+                    # Title is already sanitized in metadata filename, use as-is for file matching
+                    safe_title = title
                     title_query = title.replace(' ', '+').replace("'", '%27').replace('_', '?')
                     artist_query = artist.replace(' ', '+').replace("'", '%27')
                     url = f"https://www.youtube.com/results?search_query={title_query}+{artist_query}"
@@ -386,7 +439,7 @@ def download_with_progress(current_search, task_id):
                     driver.get(url)
 
     
-                    songs = driver.find_elements(By.ID, 'video-title')
+                    songs = driver.find_elements(By.CSS_SELECTOR, 'a#video-title')
                     for todlsong in songs:
                         if 'official video' in todlsong.get_attribute('title').lower():
                             continue
@@ -396,7 +449,7 @@ def download_with_progress(current_search, task_id):
                     song = noclip.get_attribute('href')
                     if not song.startswith('http'):
                         song = 'https://www.youtube.com' + song
-                    download_as_mp3(song, library_dir, albumtitle, title, index)
+                    download_as_mp3(song, library_dir, sanitize_filename(albumtitle), safe_title, index)
                     processed += 1
 
                     update_progress(task_id, f"Downloaded {processed}/{filecount} tracks", int(30 + (processed / filecount * 30)))
@@ -404,7 +457,7 @@ def download_with_progress(current_search, task_id):
                     driver.quit()
 
             update_progress(task_id, "Converting files to M4A...", 60)
-            album_folder = os.path.join(library_dir, albumtitle)
+            album_folder = os.path.join(library_dir, sanitize_filename(albumtitle))
 
             convert_all_mp3_to_m4a(album_folder, task_id, delete_original=True)
 
@@ -491,6 +544,8 @@ def download_with_progress(current_search, task_id):
                 if filename.endswith('.txt'):
 
                     title = filename.split('.txt')[0].split(' ', 1)[1]
+                    # Title is already sanitized in metadata filename, use as-is for file matching
+                    safe_title = title
                     title_query = title.replace(' ', '+').replace("'", '%27').replace('_', '?')
                     artist_query = artist.replace(' ', '+').replace("'", '%27')
                     url = f"https://www.youtube.com/results?search_query={title_query}+{artist_query}"
@@ -501,7 +556,7 @@ def download_with_progress(current_search, task_id):
                         return
                     driver.get(url)
 
-                    songs = driver.find_elements(By.ID, 'video-title')
+                    songs = driver.find_elements(By.CSS_SELECTOR, 'a#video-title')
                     for todlsong in songs:
                         if 'official video' in todlsong.get_attribute('title').lower():
                             continue
@@ -511,11 +566,11 @@ def download_with_progress(current_search, task_id):
                     song = noclip.get_attribute('href')
                     if not song.startswith('http'):
                         song = 'https://www.youtube.com' + song
-                    download_as_mp3(song, library_dir, albumtitle, title, 1)
+                    download_as_mp3(song, library_dir, sanitize_filename(albumtitle), safe_title, 1)
 
                     driver.quit()
 
-            album_folder = os.path.join(library_dir, albumtitle)
+            album_folder = os.path.join(library_dir, sanitize_filename(albumtitle))
             update_progress(task_id, "Converting to M4A...", 60)
             convert_all_mp3_to_m4a(album_folder, task_id, delete_original=True)
 
@@ -918,15 +973,31 @@ def run_flask():
 if __name__ == '__main__':
 
     if os.name == 'nt':
-        import subprocess
-        original_popen = subprocess.Popen
+        import subprocess as _subprocess
+        original_popen = _subprocess.Popen
         def hidden_popen(*args, **kwargs):
             if 'creationflags' not in kwargs:
-                kwargs['creationflags'] = subprocess.CREATE_NO_WINDOW
+                kwargs['creationflags'] = _subprocess.CREATE_NO_WINDOW
             return original_popen(*args, **kwargs)
-        subprocess.Popen = hidden_popen
-    
+        _subprocess.Popen = hidden_popen
+
     threading.Thread(target=run_flask, daemon=True).start()
+
+    # wait for the Flask server to be ready (avoid webview trying to load an unavailable URL)
+    import time as _time
+    import urllib.request as _urllib
+
+    start_time = _time.time()
+    timeout_seconds = 10
+    while True:
+        try:
+            _urllib.request.urlopen('http://127.0.0.1:5000', timeout=1)
+            break
+        except Exception:
+            if _time.time() - start_time > timeout_seconds:
+                print("Warning: Flask did not start within timeout - continuing anyway.")
+                break
+            _time.sleep(0.2)
 
     window = webview.create_window(
         "iTuneUp",
@@ -939,4 +1010,18 @@ if __name__ == '__main__':
         shadow=True,
     )
 
-    webview.start(gui='edgechromium', debug=False, private_mode=False, storage_path=None)
+    try:
+        # debug=False avoids extra devtools windows and can reduce hangs
+        webview.start(gui='edgechromium', debug=False, private_mode=False, storage_path=None)
+    except KeyboardInterrupt:
+        print("Interrupted by user, closing webview...")
+        try:
+            webview.windows[0].destroy()
+        except Exception:
+            pass
+    except Exception as e:
+        print(f"webview start error: {e}")
+        try:
+            webview.windows[0].destroy()
+        except Exception:
+            pass

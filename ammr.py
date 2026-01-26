@@ -2,6 +2,8 @@ from selenium import webdriver
 from selenium.webdriver.common.by import By
 from selenium.webdriver.chrome.service import Service
 from selenium.common.exceptions import NoSuchElementException
+from selenium.webdriver.support.ui import WebDriverWait
+from selenium.webdriver.support import expected_conditions as EC
 import requests
 import re
 import os
@@ -12,6 +14,18 @@ import urllib.parse
 import datetime
 import shutil
 from colorama import Fore, Back, Style, init
+
+
+# Function to sanitize filenames for Windows
+def sanitize_filename(filename):
+    """Remove or replace characters that are invalid in Windows filenames."""
+    # Windows invalid characters: \ / : * ? " < > |
+    invalid_chars = ['\\', '/', ':', '*', '?', '"', '<', '>', '|']
+    for char in invalid_chars:
+        filename = filename.replace(char, '_')
+    # Also strip leading/trailing spaces and dots
+    filename = filename.strip(' .')
+    return filename
 
 
 # To take off all the logs
@@ -52,7 +66,10 @@ def ExtractAlbumID(url, id):
 
     driver.get(url)
 
-    elements_with_class = driver.find_elements(By.CSS_SELECTOR, ".click-action.svelte-c0t0j2")
+    elements_with_class = driver.find_elements(
+    By.CSS_SELECTOR,
+    'a[data-testid="click-action"][href*="?i="]'
+    )
 
     url = elements_with_class[id].get_attribute("href")
 
@@ -70,7 +87,10 @@ def ExtractAlbumID(url, id):
 
 def ExtractAlbumTitle(argument):
 
-    albumtitle_elem = argument.find_element(By.CSS_SELECTOR, '.headings__title.svelte-1uuona0 span[dir="auto"]')
+    albumtitle_elem = argument.find_element(
+    By.CSS_SELECTOR,
+    '[data-testid="non-editable-product-title"] span[dir="auto"]'
+    )
     ALBUM = albumtitle_elem.text.strip()
 
     return ALBUM
@@ -78,9 +98,16 @@ def ExtractAlbumTitle(argument):
 # Function to extract the artist name & ID
     
 def ExtractArtistAndID(argument):
+    albumartist_elems = argument.find_elements(
+        By.CSS_SELECTOR,
+        '[data-testid="product-subtitles"] > a'
+    )
 
-    albumartist_elem = argument.find_elements(By.CSS_SELECTOR, '.headings__subtitles.svelte-1uuona0 a[data-testid="click-action"]')
-    artist_url = albumartist_elem[0].get_attribute("href")
+    if not albumartist_elems:
+        return "", ""
+
+    # Use the first <a> for the artist ID
+    artist_url = albumartist_elems[0].get_attribute("href")
 
     parsed_artist = urllib.parse.urlparse(artist_url)
     last_artist_segment = parsed_artist.path.rstrip('/').split('/')[-1]
@@ -90,10 +117,11 @@ def ExtractArtistAndID(argument):
         match = re.search(r'(\d+)(?!.*\d)', parsed_artist.path)
         ARTISTID = match.group(1) if match else ""
 
-    if len(albumartist_elem) > 1:
-        ALBUMARTIST = ', '.join([elem.text.strip() for elem in albumartist_elem])
+    # Collect all artist names
+    if len(albumartist_elems) > 1:
+        ALBUMARTIST = ', '.join([elem.text.strip() for elem in albumartist_elems])
     else:
-        ALBUMARTIST = albumartist_elem[0].text.strip()
+        ALBUMARTIST = albumartist_elems[0].text.strip()
 
     return ALBUMARTIST, ARTISTID
 
@@ -101,7 +129,10 @@ def ExtractArtistAndID(argument):
 
 def ExtractGenre(argument):
 
-    genre_elem = argument.find_element(By.CSS_SELECTOR, '.headings__metadata-bottom.svelte-1uuona0')
+    genre_elem = argument.find_element(
+    By.CSS_SELECTOR,
+    'div.headings__metadata-bottom'
+    )
     GENRE = genre_elem.text.strip()
     GENRE = GENRE.split('·')[0].strip()
     GENRE = unicodedata.normalize('NFKD', GENRE).encode('ASCII', 'ignore').decode('utf-8')
@@ -146,7 +177,12 @@ def GenreSelection(argument):
 
 def ExtractCatalogID(argument):
 
-    song_url_elem = argument.find_element(By.CSS_SELECTOR, '.click-action.svelte-c0t0j2')
+    track_elem = argument.find_element(
+    By.CSS_SELECTOR,
+    '[data-testid="track-title"]'
+    )
+    song_url_elem = track_elem.find_element(By.XPATH, './ancestor::a')
+
     song_url = song_url_elem.get_attribute("href")
 
     parsed_song = urllib.parse.urlparse(song_url)
@@ -163,7 +199,10 @@ def ExtractCatalogID(argument):
 
 def ExtractSongTitle(argument):
 
-    song_name_elem = argument.find_element(By.CSS_SELECTOR, '.songs-list-row__song-name.svelte-t6plbb')
+    song_name_elem = argument.find_element(
+    By.CSS_SELECTOR,
+    '[data-testid="track-title"]'
+    )
     TITLE = song_name_elem.text.strip()
 
     return TITLE
@@ -172,7 +211,7 @@ def ExtractSongTitle(argument):
 
 def ExtractTrackNumber(argument):
 
-    track_elem = argument.find_element(By.CSS_SELECTOR, '.songs-list-row__column-data.svelte-t6plbb[data-testid="track-number"]')
+    track_elem = argument.find_element(By.CSS_SELECTOR, '[data-testid="track-number"]')
     TRACKNUMBER = track_elem.get_attribute("textContent").strip()
 
     return TRACKNUMBER
@@ -182,7 +221,10 @@ def ExtractTrackNumber(argument):
 def ExtractItunesAdvisory(argument):
 
     try:
-        argument.find_element(By.CSS_SELECTOR, '.songs-list-row__explicit-wrapper.svelte-t6plbb')
+        argument.find_element(
+            By.CSS_SELECTOR,
+            '[data-testid="track-list-item"] [data-testid="explicit-badge"]'
+        )
         ITUNESADVISORY = 1
     except NoSuchElementException:
         ITUNESADVISORY = 0
@@ -191,32 +233,43 @@ def ExtractItunesAdvisory(argument):
 
 # Function to extract the various artists of one song (if there are)
 
-def ExtractArtists(argument, argument2):
+from selenium.common.exceptions import NoSuchElementException
+from selenium.webdriver.common.by import By
+
+def ExtractArtists(argument, fallback_artist):
 
     ARTISTS = []
 
     try:
-        artists_elem = argument.find_element(By.CSS_SELECTOR, '.songs-list-row__by-line.svelte-t6plbb.songs-list-row__by-line__mobile[data-testid="track-title-by-line"]')
-        artists_list = artists_elem.find_elements(By.CSS_SELECTOR, '.click-action.svelte-c0t0j2')
-        for artists in artists_list:
-            ARTISTS.append(artists.get_attribute("textContent").strip())
+        artists_list = argument.find_elements(
+            By.CSS_SELECTOR,
+            '[data-testid="song-name-wrapper"] a[data-testid="click-action"]'
+        )
+        for artist_elem in artists_list:
+            name = artist_elem.text.strip()
+            if name:
+                ARTISTS.append(name)
     except NoSuchElementException:
         pass
 
     if not ARTISTS:
-        ARTIST = argument2
+        ARTIST = fallback_artist
     else:
         ARTIST = ', '.join(ARTISTS)
 
     return ARTIST, ARTISTS
+
 
 # Function to extract the comment of the album (or Editor's Notes)
 
 def ExtractComment(argument):
 
     try:
-        comment_elem = argument.find_element(By.CSS_SELECTOR, '.content.svelte-p1v1m6.with-more-button')
-        COMMENT = comment_elem.get_attribute("textContent")
+        comment_elem = argument.find_element(
+            By.CSS_SELECTOR,
+            '[data-testid="truncate-text"]'
+        )
+        COMMENT = comment_elem.text.strip()
     except NoSuchElementException:
         COMMENT = ""
     
@@ -224,8 +277,11 @@ def ExtractComment(argument):
 
 def ExtractCopyrightAndDate(argument):
 
-    footer_elem = argument.find_element(By.CSS_SELECTOR, '.description.svelte-1tm9k9g[data-testid="tracklist-footer-description"]')
-    footer_text = footer_elem.get_attribute("textContent")
+    footer_elem = argument.find_element(
+        By.CSS_SELECTOR,
+        '[data-testid="tracklist-footer-description"]'
+    )
+    footer_text = footer_elem.text.strip()
 
     lines = [line.strip() for line in footer_text.split('\n') if line.strip()]
 
@@ -268,7 +324,17 @@ def ExtractMetadata(driver, id, metadata_dir):
         driver = webdriver.Chrome(service=service, options=options)
 
     driver.get(url)
-    
+
+    # wait for the album page to load and the songs list to be present
+    try:
+        WebDriverWait(driver, 15).until(
+            EC.presence_of_element_located((By.CLASS_NAME, 'songs-list-row'))
+        )
+    except Exception:
+        # fallback short sleep if wait fails for any reason
+        import time
+        time.sleep(1)
+
     ALBUM = ExtractAlbumTitle(driver)
     ALBUM.replace('?', '_').replace('.', '@')
     ALBUMSORT = ALBUM
@@ -278,22 +344,37 @@ def ExtractMetadata(driver, id, metadata_dir):
     COPYRIGHT, YEAR = ExtractCopyrightAndDate(driver)
     COMMENT = ExtractComment(driver)
 
+    # collect song row elements; ensure they are present and stable
     songs_elem = driver.find_elements(By.CLASS_NAME, 'songs-list-row')
+    if not songs_elem:
+        # try a short wait and requery
+        try:
+            WebDriverWait(driver, 5).until(
+                EC.presence_of_element_located((By.CLASS_NAME, 'songs-list-row'))
+            )
+            songs_elem = driver.find_elements(By.CLASS_NAME, 'songs-list-row')
+        except Exception:
+            songs_elem = []
 
     TOTALTRACKS = len(songs_elem)
 
     for song in songs_elem:
 
+        # extract scoped song data (use element.find_... so we stay within the row)
         ITUNESCATALOGID = ExtractCatalogID(song)
         TITLE = ExtractSongTitle(song)
         TITLE = TITLE.replace('?', '_')    
         TITLESORT = TITLE
         TRACKNUMBER = ExtractTrackNumber(song)
+        # normalize track number
+        TRACKNUMBER = TRACKNUMBER.strip()
         ITUNESADVISORY = ExtractItunesAdvisory(song)
         ARTIST, ARTISTS = ExtractArtists(song, ALBUMARTIST)
         ARTISTSORT = ARTIST
 
-        FILENAME = os.path.join(metadata_dir, TRACKNUMBER + " " + TITLE + ".txt")
+        SAFE_TITLE = sanitize_filename(TITLE)
+        FILENAME = os.path.join(metadata_dir, TRACKNUMBER + " " + SAFE_TITLE + ".txt")
+        print(f"Writing metadata for track {TRACKNUMBER}: {TITLE}")
         with open(FILENAME, "w", encoding="utf-8") as f:
             print("ALBUM           | ", ALBUM.replace('@', '.').replace('_', '?'), file=f)
             print("ALBUMARTIST     | ", ALBUMARTIST, file=f)
@@ -322,8 +403,15 @@ def ExtractMetadata(driver, id, metadata_dir):
             print("TRACK           | ", TRACKNUMBER, file=f)
             print("YEAR            | ", YEAR, file=f)
 
-        source_elem = driver.find_element(By.CSS_SELECTOR, 'source[type="image/jpeg"]')
-        srcset = source_elem.get_attribute("srcset")
+        # get album artwork (wait for source element to be available)
+        try:
+            WebDriverWait(driver, 8).until(
+                EC.presence_of_element_located((By.CSS_SELECTOR, 'source[type="image/jpeg"]'))
+            )
+            source_elem = driver.find_element(By.CSS_SELECTOR, 'source[type="image/jpeg"]')
+            srcset = source_elem.get_attribute("srcset")
+        except Exception:
+            srcset = ''
 
         urls = re.findall(r'(https?://[^\s,]+)\s+\d+w', srcset)
         if urls:
