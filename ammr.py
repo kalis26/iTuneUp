@@ -243,7 +243,7 @@ def ExtractArtists(argument, fallback_artist):
     try:
         artists_list = argument.find_elements(
             By.CSS_SELECTOR,
-            '[data-testid="song-name-wrapper"] a[data-testid="click-action"]'
+            '[data-testid="track-title-by-line"] a[data-testid="click-action"]'
         )
         for artist_elem in artists_list:
             name = artist_elem.text.strip()
