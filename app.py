@@ -6,6 +6,7 @@ from selenium import webdriver
 from selenium.webdriver.common.by import By
 from selenium.webdriver.chrome.service import Service
 from selenium.common.exceptions import NoSuchElementException
+from webdriver_manager.chrome import ChromeDriverManager
 from mutagen.mp4 import MP4, MP4FreeForm, MP4Cover
 import yt_dlp
 from pydub import AudioSegment
@@ -41,6 +42,41 @@ def resource_path(relative_path):
 
     return os.path.join(base_path, relative_path)
 
+
+def get_ffmpeg_path():
+    """Get the path to bundled FFmpeg executable."""
+    ffmpeg_path = resource_path(os.path.join('resources', 'ffmpeg.exe'))
+    if os.path.exists(ffmpeg_path):
+        return ffmpeg_path
+    return None
+
+
+def get_ffprobe_path():
+    """Get the path to bundled FFprobe executable."""
+    ffprobe_path = resource_path(os.path.join('resources', 'ffprobe.exe'))
+    if os.path.exists(ffprobe_path):
+        return ffprobe_path
+    return None
+
+
+def setup_ffmpeg():
+    """Configure pydub to use bundled FFmpeg."""
+    ffmpeg_path = get_ffmpeg_path()
+    ffprobe_path = get_ffprobe_path()
+    
+    if ffmpeg_path:
+        AudioSegment.converter = ffmpeg_path
+        print(f"Using bundled FFmpeg: {ffmpeg_path}")
+    
+    if ffprobe_path:
+        AudioSegment.ffprobe = ffprobe_path
+        print(f"Using bundled FFprobe: {ffprobe_path}")
+
+
+# Initialize FFmpeg paths on module load
+setup_ffmpeg()
+
+
 def create_safe_driver():
     try:
         options = webdriver.ChromeOptions()
@@ -49,7 +85,7 @@ def create_safe_driver():
         options.add_argument("--disable-dev-shm-usage")
         options.add_experimental_option('excludeSwitches', ['enable-logging'])
         options.add_argument("--log-level=3")
-        service = Service(log_path=os.devnull)
+        service = Service(ChromeDriverManager().install(), log_path=os.devnull)
         
         driver = webdriver.Chrome(options=options, service=service)
         return driver
@@ -194,8 +230,19 @@ def recover_metadata(file_path):
 
     return metadata
 
-def download_as_mp3(youtube_url, library_dir, title, tracktitle, index):
+def get_deno_path():
+    """Get the path to bundled Deno executable."""
+    deno_path = resource_path(os.path.join('resources', 'deno.exe'))
+    if os.path.exists(deno_path):
+        return deno_path
+    return None
 
+def download_as_mp3(youtube_url, library_dir, title, tracktitle, index, max_retries=3):
+
+    # Get bundled paths
+    deno_path = get_deno_path()
+    ffmpeg_path = get_ffmpeg_path()
+    
     ydl_opts = {
         'format': 'bestaudio/best',
         'outtmpl': os.path.join(library_dir, f'{title}/{index} {tracktitle}.%(ext)s'),
@@ -206,13 +253,35 @@ def download_as_mp3(youtube_url, library_dir, title, tracktitle, index):
         }],
         'quiet': True,
         'noplaylist': True,
+        # Network reliability options
+        'retries': 10,
+        'fragment_retries': 10,
+        'socket_timeout': 30,
+        'extractor_retries': 5,
+        'file_access_retries': 5,
+        # Fallback if preferred format unavailable
+        'ignoreerrors': False,
     }
+    
+    # Use bundled FFmpeg if available
+    if ffmpeg_path:
+        ydl_opts['ffmpeg_location'] = os.path.dirname(ffmpeg_path)
+    
+    # Use bundled Deno if available
+    if deno_path:
+        ydl_opts['extractor_args'] = {'youtube': {'js_runtimes': f'deno:{deno_path}'}}
 
-    try:
-        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-            ydl.extract_info(youtube_url, download=True)
-    except Exception as e:
-        print(f"yt-dlp error: {e}")
+    for attempt in range(max_retries):
+        try:
+            with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+                ydl.extract_info(youtube_url, download=True)
+            return  # Success, exit the function
+        except Exception as e:
+            print(f"yt-dlp error (attempt {attempt + 1}/{max_retries}): {e}")
+            if attempt < max_retries - 1:
+                time.sleep(2 ** attempt)  # Exponential backoff: 1s, 2s, 4s
+            else:
+                print(f"Failed to download after {max_retries} attempts: {tracktitle}")
 
 def convert_all_mp3_to_m4a(folder_path, task_id, delete_original=False):
 
@@ -776,6 +845,26 @@ def home():
     confirm_form = ConfirmForm()
 
     if request.method == 'GET':
+        # Check if there's an active download in progress BEFORE clearing session
+        current_task = session.get('current_task')
+        if current_task:
+            progress_data = download_progress.get(current_task)
+            if progress_data:
+                percentage = progress_data.get('percentage', 0)
+                # If download is still in progress (percentage between 0-99 and not error)
+                if 0 <= percentage < 100:
+                    return render_template('progress.html', active_page='Home', task_id=current_task)
+                # If download completed, clear the task and continue to home
+                elif percentage == 100:
+                    session.pop('current_task', None)
+                    download_progress.pop(current_task, None)
+                # If download failed, show error message
+                elif percentage == -1:
+                    error_message = progress_data.get('message', 'Download failed')
+                    session.pop('current_task', None)
+                    download_progress.pop(current_task, None)
+                    flash(f'Download failed: {error_message}')
+
         if request.args.get('download') == 'success':
             flash('Download completed successfully')
 
@@ -784,7 +873,7 @@ def home():
             session.pop('artist', None)
             session.pop('current_search', None)
             session.pop('currentid', None)
-            session.pop('current_task', None)
+            # Don't clear current_task here - it's handled above
             print("GET request - session cleared")
 
     if request.method == 'POST':

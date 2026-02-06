@@ -2,6 +2,7 @@ from selenium import webdriver
 from selenium.webdriver.common.by import By
 from selenium.webdriver.chrome.service import Service
 from selenium.common.exceptions import NoSuchElementException
+from webdriver_manager.chrome import ChromeDriverManager
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 import requests
@@ -60,7 +61,7 @@ def ExtractAlbumID(url, id):
     options.add_argument("--disable-logging")
     options.add_argument("--disable-gpu")
     options.add_argument("--no-sandbox")
-    service = Service(log_path=os.devnull)
+    service = Service(ChromeDriverManager().install(), log_path=os.devnull)
     with suppress_stderr():
         driver = webdriver.Chrome(service=service, options=options)
 
@@ -318,7 +319,7 @@ def ExtractMetadata(driver, id, metadata_dir):
     options.add_argument("--disable-gpu")
     options.add_argument("--no-sandbox")
 
-    service = Service(log_path=os.devnull)
+    service = Service(ChromeDriverManager().install(), log_path=os.devnull)
 
     with suppress_stderr():
         driver = webdriver.Chrome(service=service, options=options)
@@ -374,7 +375,6 @@ def ExtractMetadata(driver, id, metadata_dir):
 
         SAFE_TITLE = sanitize_filename(TITLE)
         FILENAME = os.path.join(metadata_dir, TRACKNUMBER + " " + SAFE_TITLE + ".txt")
-        print(f"Writing metadata for track {TRACKNUMBER}: {TITLE}")
         with open(FILENAME, "w", encoding="utf-8") as f:
             print("ALBUM           | ", ALBUM.replace('@', '.').replace('_', '?'), file=f)
             print("ALBUMARTIST     | ", ALBUMARTIST, file=f)
@@ -495,7 +495,7 @@ if __name__ == "__main__":
                 options.add_argument("--disable-gpu")
                 options.add_argument("--no-sandbox")
 
-                service = Service(log_path=os.devnull)
+                service = Service(ChromeDriverManager().install(), log_path=os.devnull)
 
                 with suppress_stderr():
                     driver = webdriver.Chrome(service=service, options=options)
