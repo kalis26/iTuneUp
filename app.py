@@ -10,7 +10,7 @@ from webdriver_manager.chrome import ChromeDriverManager
 from mutagen.mp4 import MP4, MP4FreeForm, MP4Cover
 import yt_dlp
 from pydub import AudioSegment
-from ammr import ExtractMetadata
+from ammr import ExtractMetadata, ExtractSingleSongMetadata
 import re
 import threading
 import time
@@ -489,7 +489,8 @@ def show_search_results(form, confirm_form, title, artist, searchid):
             'title': title,
             'artist': artist,
             'id': searchid,
-            'total_results': len(grid_elem)
+            'total_results': len(grid_elem),
+            'single_song_only': session.get('single_song_only', False)
         }
 
         return render_template('home.html', form=form, confirm_form=confirm_form, active_page='Home', 
@@ -520,6 +521,7 @@ def download_with_progress(current_search, task_id):
 
         title = current_search['title']
         artist = current_search['artist']
+        single_song_only = current_search.get('single_song_only', False)
 
         url = f"https://music.apple.com/us/search?term={title.replace(' ', '%20')}%20{artist.replace(' ', '%20')}"
         id = current_search['id']
@@ -528,10 +530,16 @@ def download_with_progress(current_search, task_id):
         update_progress(task_id, "Setting up directories...", 10)
 
         print(f"Searching for: {title} by {artist}")
+        print(f"Single song only mode: {single_song_only}")
 
-        title, artist = ExtractMetadata(url, id, metadata_dir)
+        # Use the appropriate metadata extraction function
+        if single_song_only:
+            update_progress(task_id, "Extracting single song metadata...", 15)
+            album_title, artist = ExtractSingleSongMetadata(url, id, metadata_dir, title)
+        else:
+            album_title, artist = ExtractMetadata(url, id, metadata_dir)
 
-        print(f"Extracted metadata - Title: {title}, Artist: {artist}")
+        print(f"Extracted metadata - Title: {album_title}, Artist: {artist}")
 
         filecount = 0
 
@@ -546,7 +554,7 @@ def download_with_progress(current_search, task_id):
             processed = 0
             update_progress(task_id, "Downloading album tracks...", 30)
 
-            albumtitle = title
+            albumtitle = album_title
 
             for filename in os.listdir(metadata_dir):
                 if filename.endswith('.txt'):
@@ -665,11 +673,13 @@ def download_with_progress(current_search, task_id):
 
             update_progress(task_id, "Downloading single track...", 30)
 
-            albumtitle = title
+            albumtitle = album_title
             
             for filename in os.listdir(metadata_dir):
                 if filename.endswith('.txt'):
 
+                    # Extract actual track number from metadata filename
+                    track_number = int(filename.split('.txt')[0].split(' ')[0])
                     title = filename.split('.txt')[0].split(' ', 1)[1]
                     # Title is already sanitized in metadata filename, use as-is for file matching
                     safe_title = title
@@ -693,7 +703,7 @@ def download_with_progress(current_search, task_id):
                     song = noclip.get_attribute('href')
                     if not song.startswith('http'):
                         song = 'https://www.youtube.com' + song
-                    download_as_mp3(song, library_dir, sanitize_filename(albumtitle), safe_title, 1)
+                    download_as_mp3(song, library_dir, sanitize_filename(albumtitle), safe_title, track_number)
 
                     driver.quit()
 
@@ -931,6 +941,7 @@ def home():
             session.pop('artist', None)
             session.pop('current_search', None)
             session.pop('currentid', None)
+            session.pop('single_song_only', None)
             # Don't clear current_task here - it's handled above
             print("GET request - session cleared")
 
@@ -981,6 +992,7 @@ def home():
 
             title = form.album.data
             artist = form.artist.data
+            single_song_only = form.single_song_only.data
                 
             if not title.strip() or not artist.strip():
                 flash('Please enter an album & artist name to search. Both are required.')
@@ -989,6 +1001,7 @@ def home():
             session['title'] = title
             session['artist'] = artist
             session['currentid'] = 0
+            session['single_song_only'] = single_song_only
                 
             return show_search_results(form, confirm_form, title, artist, 0)
 

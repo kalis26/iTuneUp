@@ -426,6 +426,164 @@ def ExtractMetadata(driver, id, metadata_dir):
 
     return ALBUM, ALBUMARTIST
 
+
+def ExtractSingleSongMetadata(driver_url, id, metadata_dir, searched_title):
+    """
+    Extract metadata for only the song that matches the searched title.
+    This downloads just that one song instead of the full album.
+    """
+    TOTALDISCS = 1
+    DISCNUMBER = 1
+    COMPILATION = 0
+    ITUNESGAPLESS = 0
+    ITUNESMEDIATYPE = "Normal"
+
+    url, ITUNESALBUMID = ExtractAlbumID(driver_url, id)
+
+    options = webdriver.ChromeOptions()
+    options.add_experimental_option('excludeSwitches', ['enable-logging'])
+    options.add_argument("--headless")
+    options.add_argument("--log-level=3")
+    options.add_argument("--disable-logging")
+    options.add_argument("--disable-gpu")
+    options.add_argument("--no-sandbox")
+
+    service = Service(ChromeDriverManager().install(), log_path=os.devnull)
+
+    with suppress_stderr():
+        driver = webdriver.Chrome(service=service, options=options)
+
+    driver.get(url)
+
+    # wait for the album page to load and the songs list to be present
+    try:
+        WebDriverWait(driver, 15).until(
+            EC.presence_of_element_located((By.CLASS_NAME, 'songs-list-row'))
+        )
+    except Exception:
+        import time
+        time.sleep(1)
+
+    ALBUM = ExtractAlbumTitle(driver)
+    ALBUM = ALBUM.replace('?', '_').replace('.', '@')
+    ALBUMSORT = ALBUM
+    ALBUMARTIST, ITUNESARTISTID = ExtractArtistAndID(driver)
+    GENRE = ExtractGenre(driver)
+    ITUNESGENREID = GenreSelection(GENRE)
+    COPYRIGHT, YEAR = ExtractCopyrightAndDate(driver)
+    COMMENT = ExtractComment(driver)
+
+    # collect song row elements
+    songs_elem = driver.find_elements(By.CLASS_NAME, 'songs-list-row')
+    if not songs_elem:
+        try:
+            WebDriverWait(driver, 5).until(
+                EC.presence_of_element_located((By.CLASS_NAME, 'songs-list-row'))
+            )
+            songs_elem = driver.find_elements(By.CLASS_NAME, 'songs-list-row')
+        except Exception:
+            songs_elem = []
+
+    TOTALTRACKS = len(songs_elem)
+
+    # Normalize the searched title for comparison
+    searched_title_lower = searched_title.lower().strip()
+    
+    # Find the best matching song
+    best_match = None
+    best_match_score = 0
+    
+    for song in songs_elem:
+        TITLE = ExtractSongTitle(song)
+        title_lower = TITLE.lower().strip()
+        
+        # Calculate match score
+        # Exact match
+        if title_lower == searched_title_lower:
+            best_match = song
+            best_match_score = 100
+            break
+        # Title contains searched term or vice versa
+        elif searched_title_lower in title_lower or title_lower in searched_title_lower:
+            score = len(searched_title_lower) / max(len(title_lower), 1) * 80
+            if score > best_match_score:
+                best_match = song
+                best_match_score = score
+    
+    # If no match found, use the first song
+    if best_match is None and songs_elem:
+        best_match = songs_elem[0]
+    
+    if best_match is None:
+        driver.quit()
+        return ALBUM, ALBUMARTIST
+    
+    # Extract metadata for the matched song only
+    song = best_match
+    ITUNESCATALOGID = ExtractCatalogID(song)
+    TITLE = ExtractSongTitle(song)
+    TITLE = TITLE.replace('?', '_')
+    TITLESORT = TITLE
+    TRACKNUMBER = ExtractTrackNumber(song)
+    TRACKNUMBER = TRACKNUMBER.strip()
+    ITUNESADVISORY = ExtractItunesAdvisory(song)
+    ARTIST, ARTISTS = ExtractArtists(song, ALBUMARTIST)
+    ARTISTSORT = ARTIST
+
+    SAFE_TITLE = sanitize_filename(TITLE)
+    FILENAME = os.path.join(metadata_dir, TRACKNUMBER + " " + SAFE_TITLE + ".txt")
+    with open(FILENAME, "w", encoding="utf-8") as f:
+        print("ALBUM           | ", ALBUM.replace('@', '.').replace('_', '?'), file=f)
+        print("ALBUMARTIST     | ", ALBUMARTIST, file=f)
+        print('ALBUMSORT       | ', ALBUMSORT, file=f)
+        print('ARTIST          | ', ARTIST, file=f)
+        print('ARTISTSORT      | ', ARTISTSORT, file=f)
+        if ARTISTS:
+            for artists in ARTISTS:
+                print('ARTISTS         | ', artists, file=f)
+        print('COMMENT         | ', COMMENT, file=f)
+        print('COMPILATION     | ', COMPILATION, file=f)
+        print('COPYRIGHT       | ', COPYRIGHT, file=f)
+        print('DISCNUMBER      | ', DISCNUMBER, file=f)
+        print('GENRE           | ', GENRE, file=f)
+        print("ITUNESADVISORY  | ", ITUNESADVISORY, file=f)
+        print("ITUNESALBUMID   | ", ITUNESALBUMID, file=f)
+        print("ITUNESARTISTID  | ", ITUNESARTISTID, file=f)
+        print("ITUNESCATALOGID | ", ITUNESCATALOGID, file=f)
+        print('ITUNESGENREID   | ', ITUNESGENREID, file=f)
+        print('ITUNESGAPLESS   | ', ITUNESGAPLESS, file=f)
+        print('ITUNESMEDIATYPE | ', ITUNESMEDIATYPE, file=f)
+        print("TITLE           | ", TITLE.replace('_', '?'), file=f)
+        print("TITLESORT       | ", TITLESORT, file=f)
+        print("TOTALDISCS      | ", TOTALDISCS, file=f)
+        print("TOTALTRACKS     | ", TOTALTRACKS, file=f)
+        print("TRACK           | ", TRACKNUMBER, file=f)
+        print("YEAR            | ", YEAR, file=f)
+
+    # get album artwork
+    try:
+        WebDriverWait(driver, 8).until(
+            EC.presence_of_element_located((By.CSS_SELECTOR, 'source[type="image/jpeg"]'))
+        )
+        source_elem = driver.find_element(By.CSS_SELECTOR, 'source[type="image/jpeg"]')
+        srcset = source_elem.get_attribute("srcset")
+    except Exception:
+        srcset = ''
+
+    urls = re.findall(r'(https?://[^\s,]+)\s+\d+w', srcset)
+    if urls:
+        last_url = urls[-1]
+        img_data = requests.get(last_url).content
+        image_path = os.path.join(metadata_dir, 'artwork.jpg')
+
+        with open(image_path, 'wb') as handler:
+            handler.write(img_data)
+
+    driver.quit()
+
+    return ALBUM, ALBUMARTIST
+
+
 def clear():
     os.system('cls' if os.name == 'nt' else 'clear')
 

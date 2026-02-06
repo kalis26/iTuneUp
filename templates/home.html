@@ -27,6 +27,13 @@
                 </div>
             </p>
 
+            <p>
+                <div class="checkbox-container">
+                    {{ form.single_song_only(id="single-song-checkbox") }}
+                    <label for="single-song-checkbox" class="checkbox-label">Download this song only (not the full album)</label>
+                </div>
+            </p>
+
             {% if not Name %}
                 <!-- Show search button when no results -->
                 <p>
