@@ -145,9 +145,9 @@ def create_safe_driver():
 app = Flask(__name__, template_folder=resource_path('templates'), static_folder=resource_path('static'))
 app.config['SECRET_KEY'] = secrets.token_urlsafe(32)
 
-def add_metadata(file_path, image_path, artists, album, albumartist, albumsort, artist, artistsort, comment, compilation, copyright, 
-                 discnumber, genre, itunesadvisory, itunesalbumid, itunesartistid, itunescatalogid, itunesgenreid,
-                 itunesgapless, itunesmediatype, title, titlesort, totaltracks, track, year):
+def add_metadata(file_path, image_path, artists, album, albumartist, albumsort, artist, artistsort, comment, copyright, 
+                 discnumber, genre, itunesadvisory, itunesalbumid, itunesartistid, itunescatalogid, itunesgenreid, 
+                 itunesmediatype, title, titlesort, totaltracks, track, year):
 
     audio = MP4(file_path)
 
@@ -177,12 +177,6 @@ def add_metadata(file_path, image_path, artists, album, albumartist, albumsort, 
         audio["\xa9day"] = [year]
     if comment:
         audio["\xa9cmt"] = [comment]
-
-    if compilation is not None:
-        try:
-            audio["cpil"] = [int(compilation)]
-        except Exception:
-            pass
 
     if discnumber is not None:
         try:
@@ -217,12 +211,6 @@ def add_metadata(file_path, image_path, artists, album, albumartist, albumsort, 
     if itunesgenreid:
         try:
             audio["geID"] = [int(itunesgenreid)]
-        except Exception:
-            pass
-
-    if itunesgapless is not None:
-        try:
-            audio["pgap"] = [int(itunesgapless)]
         except Exception:
             pass
 
