@@ -305,8 +305,6 @@ def ExtractMetadata(driver, id, metadata_dir):
 
     TOTALDISCS = 1
     DISCNUMBER = 1
-    COMPILATION = 0
-    ITUNESGAPLESS = 0
     ITUNESMEDIATYPE = "Normal"
 
     url, ITUNESALBUMID = ExtractAlbumID(driver, id)
@@ -385,7 +383,6 @@ def ExtractMetadata(driver, id, metadata_dir):
                 for artists in ARTISTS:
                     print('ARTISTS         | ', artists, file=f)
             print('COMMENT         | ', COMMENT, file=f)
-            print('COMPILATION     | ', COMPILATION, file=f)
             print('COPYRIGHT       | ', COPYRIGHT, file=f)
             print('DISCNUMBER      | ', DISCNUMBER, file=f)
             print('GENRE           | ', GENRE, file=f)
@@ -394,7 +391,6 @@ def ExtractMetadata(driver, id, metadata_dir):
             print("ITUNESARTISTID  | ", ITUNESARTISTID, file=f)
             print("ITUNESCATALOGID | ", ITUNESCATALOGID, file=f)
             print('ITUNESGENREID   | ', ITUNESGENREID, file=f)
-            print('ITUNESGAPLESS   | ', ITUNESGAPLESS, file=f)
             print('ITUNESMEDIATYPE | ', ITUNESMEDIATYPE, file=f)
             print("TITLE           | ", TITLE.replace('_', '?'), file=f)
             print("TITLESORT       | ", TITLESORT, file=f)
@@ -434,8 +430,6 @@ def ExtractSingleSongMetadata(driver_url, id, metadata_dir, searched_title):
     """
     TOTALDISCS = 1
     DISCNUMBER = 1
-    COMPILATION = 0
-    ITUNESGAPLESS = 0
     ITUNESMEDIATYPE = "Normal"
 
     url, ITUNESALBUMID = ExtractAlbumID(driver_url, id)
@@ -542,7 +536,6 @@ def ExtractSingleSongMetadata(driver_url, id, metadata_dir, searched_title):
             for artists in ARTISTS:
                 print('ARTISTS         | ', artists, file=f)
         print('COMMENT         | ', COMMENT, file=f)
-        print('COMPILATION     | ', COMPILATION, file=f)
         print('COPYRIGHT       | ', COPYRIGHT, file=f)
         print('DISCNUMBER      | ', DISCNUMBER, file=f)
         print('GENRE           | ', GENRE, file=f)
@@ -551,7 +544,6 @@ def ExtractSingleSongMetadata(driver_url, id, metadata_dir, searched_title):
         print("ITUNESARTISTID  | ", ITUNESARTISTID, file=f)
         print("ITUNESCATALOGID | ", ITUNESCATALOGID, file=f)
         print('ITUNESGENREID   | ', ITUNESGENREID, file=f)
-        print('ITUNESGAPLESS   | ', ITUNESGAPLESS, file=f)
         print('ITUNESMEDIATYPE | ', ITUNESMEDIATYPE, file=f)
         print("TITLE           | ", TITLE.replace('_', '?'), file=f)
         print("TITLESORT       | ", TITLESORT, file=f)
