@@ -14,6 +14,7 @@ import unicodedata
 import urllib.parse
 import datetime
 import shutil
+import difflib
 from colorama import Fore, Back, Style, init
 
 
@@ -482,31 +483,55 @@ def ExtractSingleSongMetadata(driver_url, id, metadata_dir, searched_title):
 
     # Normalize the searched title for comparison
     searched_title_lower = searched_title.lower().strip()
+    searched_words = set(searched_title_lower.split())
     
-    # Find the best matching song
+    # Find the best matching song with tighter comparison
     best_match = None
     best_match_score = 0
+    MIN_THRESHOLD = 0.7  # Minimum similarity score to accept a match
     
     for song in songs_elem:
         TITLE = ExtractSongTitle(song)
         title_lower = TITLE.lower().strip()
+        title_words = set(title_lower.split())
         
-        # Calculate match score
-        # Exact match
+        # Calculate match score using multiple criteria
+        score = 0
+        
+        # 1. Exact match - highest priority
         if title_lower == searched_title_lower:
             best_match = song
             best_match_score = 100
             break
-        # Title contains searched term or vice versa
-        elif searched_title_lower in title_lower or title_lower in searched_title_lower:
-            score = len(searched_title_lower) / max(len(title_lower), 1) * 80
-            if score > best_match_score:
-                best_match = song
-                best_match_score = score
+        
+        # 2. Sequence similarity using difflib (0-1 ratio)
+        seq_ratio = difflib.SequenceMatcher(None, searched_title_lower, title_lower).ratio()
+        
+        # 3. Word overlap ratio
+        common_words = searched_words & title_words
+        word_overlap = len(common_words) / max(len(searched_words), len(title_words), 1)
+        
+        # 4. Check if all searched words appear in title (order-independent)
+        all_words_present = searched_words.issubset(title_words)
+        
+        # Weighted score: sequence similarity (60%) + word overlap (30%) + bonus for all words (10%)
+        score = (seq_ratio * 60) + (word_overlap * 30) + (10 if all_words_present else 0)
+        
+        # Only consider if above minimum threshold
+        if score > best_match_score and seq_ratio >= MIN_THRESHOLD:
+            best_match = song
+            best_match_score = score
     
-    # If no match found, use the first song
+    # If no good match found, try to find the closest match above a lower threshold
     if best_match is None and songs_elem:
-        best_match = songs_elem[0]
+        fallback_threshold = 0.5
+        for song in songs_elem:
+            TITLE = ExtractSongTitle(song)
+            title_lower = TITLE.lower().strip()
+            seq_ratio = difflib.SequenceMatcher(None, searched_title_lower, title_lower).ratio()
+            if seq_ratio >= fallback_threshold and seq_ratio * 100 > best_match_score:
+                best_match = song
+                best_match_score = seq_ratio * 100
     
     if best_match is None:
         driver.quit()
