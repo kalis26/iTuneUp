@@ -2,8 +2,8 @@
 
 VSVersionInfo(
   ffi=FixedFileInfo(
-    filevers=(1, 2, 7, 0),
-    prodvers=(1, 2, 7, 0),
+    filevers=(1, 3, 0, 0),
+    prodvers=(1, 3, 0, 0),
     mask=0x3f,
     flags=0x0,
     OS=0x40004,
@@ -19,12 +19,12 @@ VSVersionInfo(
           [
             StringStruct('CompanyName', 'iTuneUp'),
             StringStruct('FileDescription', 'iTuneUp Desktop App'),
-            StringStruct('FileVersion', '1.2.7'),
+            StringStruct('FileVersion', '1.3.0'),
             StringStruct('InternalName', 'iTuneUp'),
             StringStruct('OriginalFilename', 'iTuneUp.exe'),
             StringStruct('ProductName', 'iTuneUp'),
-            StringStruct('ProductVersion', '1.2.7'),
-            StringStruct('LegalCopyright', 'Copyright © 2026')
+            StringStruct('ProductVersion', '1.3.0'),
+            StringStruct('LegalCopyright', 'Copyright © 2026 Amine Mustapha Rachid')
           ]
         )
       ]
