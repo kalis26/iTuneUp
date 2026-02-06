@@ -43,34 +43,83 @@ def resource_path(relative_path):
     return os.path.join(base_path, relative_path)
 
 
+def get_app_directory():
+    """Get the directory where the application is installed."""
+    if getattr(sys, 'frozen', False):
+        # Running as compiled exe - use the exe's directory
+        return os.path.dirname(sys.executable)
+    else:
+        # Running as script - use script directory
+        return os.path.dirname(os.path.abspath(__file__))
+
+
 def get_ffmpeg_path():
-    """Get the path to bundled FFmpeg executable."""
-    ffmpeg_path = resource_path(os.path.join('resources', 'ffmpeg.exe'))
+    """Get the path to FFmpeg executable."""
+    app_dir = get_app_directory()
+    
+    # Check in app directory (where Inno Setup installs it)
+    ffmpeg_path = os.path.join(app_dir, 'ffmpeg.exe')
     if os.path.exists(ffmpeg_path):
         return ffmpeg_path
-    return None
+    
+    # Check in resources subfolder (for development)
+    ffmpeg_path = os.path.join(app_dir, 'resources', 'ffmpeg.exe')
+    if os.path.exists(ffmpeg_path):
+        return ffmpeg_path
+    
+    # Fallback: hope it's in system PATH
+    return "ffmpeg"
 
 
 def get_ffprobe_path():
-    """Get the path to bundled FFprobe executable."""
-    ffprobe_path = resource_path(os.path.join('resources', 'ffprobe.exe'))
+    """Get the path to FFprobe executable."""
+    app_dir = get_app_directory()
+    
+    # Check in app directory
+    ffprobe_path = os.path.join(app_dir, 'ffprobe.exe')
     if os.path.exists(ffprobe_path):
         return ffprobe_path
+    
+    # Check in resources subfolder (for development)
+    ffprobe_path = os.path.join(app_dir, 'resources', 'ffprobe.exe')
+    if os.path.exists(ffprobe_path):
+        return ffprobe_path
+    
+    # Fallback
+    return "ffprobe"
+
+
+def get_deno_path():
+    """Get the path to Deno executable."""
+    app_dir = get_app_directory()
+    
+    # Check in app directory
+    deno_path = os.path.join(app_dir, 'deno.exe')
+    if os.path.exists(deno_path):
+        return deno_path
+    
+    # Check in resources subfolder (for development)
+    deno_path = os.path.join(app_dir, 'resources', 'deno.exe')
+    if os.path.exists(deno_path):
+        return deno_path
+    
+    # Fallback
     return None
 
 
 def setup_ffmpeg():
-    """Configure pydub to use bundled FFmpeg."""
+    """Configure pydub to use FFmpeg."""
     ffmpeg_path = get_ffmpeg_path()
     ffprobe_path = get_ffprobe_path()
     
-    if ffmpeg_path:
-        AudioSegment.converter = ffmpeg_path
-        print(f"Using bundled FFmpeg: {ffmpeg_path}")
+    # Set pydub converter paths
+    AudioSegment.converter = ffmpeg_path
+    AudioSegment.ffmpeg = ffmpeg_path
+    AudioSegment.ffprobe = ffprobe_path
     
-    if ffprobe_path:
-        AudioSegment.ffprobe = ffprobe_path
-        print(f"Using bundled FFprobe: {ffprobe_path}")
+    print(f"FFmpeg path: {ffmpeg_path}")
+    print(f"FFprobe path: {ffprobe_path}")
+    print(f"FFmpeg exists: {os.path.exists(ffmpeg_path) if ffmpeg_path != 'ffmpeg' else 'using system'}")
 
 
 # Initialize FFmpeg paths on module load
@@ -230,16 +279,9 @@ def recover_metadata(file_path):
 
     return metadata
 
-def get_deno_path():
-    """Get the path to bundled Deno executable."""
-    deno_path = resource_path(os.path.join('resources', 'deno.exe'))
-    if os.path.exists(deno_path):
-        return deno_path
-    return None
-
 def download_as_mp3(youtube_url, library_dir, title, tracktitle, index, max_retries=3):
 
-    # Get bundled paths
+    # Get paths to external tools
     deno_path = get_deno_path()
     ffmpeg_path = get_ffmpeg_path()
     
@@ -285,9 +327,18 @@ def download_as_mp3(youtube_url, library_dir, title, tracktitle, index, max_retr
 
 def convert_all_mp3_to_m4a(folder_path, task_id, delete_original=False):
 
+    # Re-setup FFmpeg paths at runtime to ensure they're correct after PyInstaller extraction
+    setup_ffmpeg()
+    
     mp3_files = [f for f in os.listdir(folder_path) if f.lower().endswith(".mp3")]
     total_files = len(mp3_files)
+    
+    if total_files == 0:
+        print("No MP3 files found to convert")
+        return
+        
     converted_count = 0
+    failed_files = []
 
     for filename in mp3_files:
         mp3_path = os.path.join(folder_path, filename)
@@ -298,17 +349,24 @@ def convert_all_mp3_to_m4a(folder_path, task_id, delete_original=False):
                 progress_percent = 60 + (converted_count / total_files * 20)
                 update_progress(task_id, f"Converting files... {converted_count + 1}/{total_files}", int(progress_percent))
 
+            print(f"Converting: {filename}")
             audio = AudioSegment.from_mp3(mp3_path)
             audio.export(m4a_path, format="ipod")
+            print(f"Successfully converted: {filename}")
                 
-            if delete_original:
+            if delete_original and os.path.exists(m4a_path):
                 os.remove(mp3_path)
+                print(f"Deleted original: {filename}")
 
             converted_count += 1
 
         except Exception as e:
             print(f"Failed to convert {filename}: {e}")
+            failed_files.append(filename)
             converted_count += 1
+    
+    if failed_files:
+        print(f"Failed to convert {len(failed_files)} files: {failed_files}")
     
 def cleanup_metadata_dir(metadata_dir):
 
@@ -1060,6 +1118,9 @@ def run_flask():
     app.run(host='127.0.0.1', port=5000, debug=False)
 
 if __name__ == '__main__':
+
+    # Re-initialize FFmpeg paths at startup
+    setup_ffmpeg()
 
     if os.name == 'nt':
         import subprocess as _subprocess
