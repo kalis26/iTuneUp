@@ -1,5 +1,12 @@
 import os
 import sys
+
+# Fix Windows console encoding for non-ASCII characters (e.g. ∞ in song metadata)
+if sys.stdout and hasattr(sys.stdout, 'reconfigure'):
+    sys.stdout.reconfigure(encoding='utf-8', errors='replace')
+if sys.stderr and hasattr(sys.stderr, 'reconfigure'):
+    sys.stderr.reconfigure(encoding='utf-8', errors='replace')
+
 from flask import Flask, render_template, request, flash, session, jsonify
 from forms import SearchForm, ConfirmForm
 from selenium import webdriver
@@ -21,6 +28,7 @@ import webview
 import json
 import subprocess
 import platform
+from urllib.parse import urlparse, parse_qs
 
 
 def sanitize_filename(filename):
@@ -140,6 +148,34 @@ def create_safe_driver():
         return driver
     except Exception as e:
         print(f"Failed to create WebDriver: {e}")
+        return None
+
+
+def is_valid_apple_music_url(url):
+    """Validate Apple Music URL format for direct download mode."""
+    if not url:
+        return False
+
+    try:
+        parsed = urlparse(url.strip())
+    except Exception:
+        return False
+
+    if parsed.scheme not in ('http', 'https'):
+        return False
+
+    host = parsed.netloc.lower()
+    return host == 'music.apple.com' or host.endswith('.music.apple.com')
+
+
+def get_apple_music_song_id(url):
+    """Extract song id from Apple Music URLs like ?i=123 when present."""
+    try:
+        parsed = urlparse(url)
+        query = parse_qs(parsed.query)
+        song_id = query.get('i', [None])[0]
+        return str(song_id) if song_id else None
+    except Exception:
         return None
 
 app = Flask(__name__, template_folder=resource_path('templates'), static_folder=resource_path('static'))
@@ -311,7 +347,7 @@ def download_as_mp3(youtube_url, library_dir, title, tracktitle, index, max_retr
             if attempt < max_retries - 1:
                 time.sleep(2 ** attempt)  # Exponential backoff: 1s, 2s, 4s
             else:
-                print(f"Failed to download after {max_retries} attempts: {tracktitle}")
+                raise RuntimeError(f"Failed to download after {max_retries} attempts: {tracktitle}")
 
 def convert_all_mp3_to_m4a(folder_path, task_id, delete_original=False):
 
@@ -404,7 +440,7 @@ def show_search_results(form, confirm_form, title, artist, searchid):
     driver = create_safe_driver()
     if not driver:
         flash('Failed to create WebDriver. Please check your Chrome installation.')
-        return render_template('home.html', form=form, confirm_form=confirm_form, active_page='Home')
+        return render_template('home.html', form=form, confirm_form=confirm_form, active_page='Home', selected_tab='search')
 
     try:
 
@@ -418,11 +454,11 @@ def show_search_results(form, confirm_form, title, artist, searchid):
 
         if not grid_elem:
             flash('No search results found.')
-            return render_template('home.html', form=form, confirm_form=confirm_form, active_page='Home')
+            return render_template('home.html', form=form, confirm_form=confirm_form, active_page='Home', selected_tab='search')
 
         if searchid >= len(grid_elem):
             flash('No more results found.')
-            return render_template('home.html', form=form, confirm_form=confirm_form, active_page='Home')
+            return render_template('home.html', form=form, confirm_form=confirm_form, active_page='Home', selected_tab='search')
 
         current_element = grid_elem[searchid]
         
@@ -481,12 +517,12 @@ def show_search_results(form, confirm_form, title, artist, searchid):
             'single_song_only': session.get('single_song_only', False)
         }
 
-        return render_template('home.html', form=form, confirm_form=confirm_form, active_page='Home', 
-                                 Name=Name, Details=Details, IMG=imgurl)
+        return render_template('home.html', form=form, confirm_form=confirm_form, active_page='Home',
+                     Name=Name, Details=Details, IMG=imgurl, selected_tab='search')
                                  
     except Exception as e:
             flash(f'Error extracting search result: {str(e)}')
-            return render_template('home.html', form=form, confirm_form=confirm_form, active_page='Home')
+            return render_template('home.html', form=form, confirm_form=confirm_form, active_page='Home', selected_tab='search')
     
     finally:
         driver.quit()
@@ -507,12 +543,21 @@ def download_with_progress(current_search, task_id):
 
         update_progress(task_id, 'Initializing download...', 5)
 
-        title = current_search['title']
-        artist = current_search['artist']
+        title = current_search.get('title', '')
+        artist = current_search.get('artist', '')
         single_song_only = current_search.get('single_song_only', False)
+        direct_url = current_search.get('direct_url')
+        target_song_id = current_search.get('target_song_id')
 
-        url = f"https://music.apple.com/us/search?term={title.replace(' ', '%20')}%20{artist.replace(' ', '%20')}"
-        id = current_search['id']
+        if direct_url:
+            url = direct_url
+            id = current_search.get('id', 0)
+            # Song links include ?i=... and should default to single-track extraction.
+            if get_apple_music_song_id(direct_url):
+                single_song_only = True
+        else:
+            url = f"https://music.apple.com/us/search?term={title.replace(' ', '%20')}%20{artist.replace(' ', '%20')}"
+            id = current_search['id']
 
         metadata_dir, library_dir = setup_directories()
         update_progress(task_id, "Setting up directories...", 10)
@@ -523,7 +568,7 @@ def download_with_progress(current_search, task_id):
         # Use the appropriate metadata extraction function
         if single_song_only:
             update_progress(task_id, "Extracting single song metadata...", 15)
-            album_title, artist = ExtractSingleSongMetadata(url, id, metadata_dir, title)
+            album_title, artist = ExtractSingleSongMetadata(url, id, metadata_dir, title, target_song_id=target_song_id)
         else:
             album_title, artist = ExtractMetadata(url, id, metadata_dir)
 
@@ -534,6 +579,12 @@ def download_with_progress(current_search, task_id):
         for filename in os.listdir(metadata_dir):
             if filename.endswith('.txt'):
                 filecount += 1
+
+        print(f"Found {filecount} metadata file(s)")
+
+        if filecount == 0:
+            update_progress(task_id, 'Error: No matching song found in the album. Try a different search.', -1)
+            return
 
         update_progress(task_id, "Searching for content...", 20)
 
@@ -581,6 +632,7 @@ def download_with_progress(current_search, task_id):
 
             update_progress(task_id, "Converting files to M4A...", 60)
             album_folder = os.path.join(library_dir, sanitize_filename(albumtitle))
+            os.makedirs(album_folder, exist_ok=True)
 
             convert_all_mp3_to_m4a(album_folder, task_id, delete_original=True)
 
@@ -694,6 +746,7 @@ def download_with_progress(current_search, task_id):
                     driver.quit()
 
             album_folder = os.path.join(library_dir, sanitize_filename(albumtitle))
+            os.makedirs(album_folder, exist_ok=True)
             update_progress(task_id, "Converting to M4A...", 60)
             convert_all_mp3_to_m4a(album_folder, task_id, delete_original=True)
 
@@ -704,41 +757,44 @@ def download_with_progress(current_search, task_id):
                     metadata_filepath = os.path.join(metadata_dir, filename)
                     music_filepath = os.path.join(album_folder, filename.split('.txt')[0] + '.m4a')
 
-            metadata = recover_metadata(metadata_filepath)
+                    metadata = recover_metadata(metadata_filepath)
 
-            artists = metadata.get("ARTISTS")
-            if artists is None:
-                artists_list = []
-            elif isinstance(artists, list):
-                artists_list = artists
-            else:
-                artists_list = [artists]
+                    artists = metadata.get("ARTISTS")
+                    if artists is None:
+                        artists_list = []
+                    elif isinstance(artists, list):
+                        artists_list = artists
+                    else:
+                        artists_list = [artists]
 
-            add_metadata(
-                music_filepath,
-                os.path.join(metadata_dir, 'artwork.jpg'),
-                artists_list,
-                metadata.get("ALBUM"),
-                metadata.get("ALBUMARTIST"),
-                metadata.get("ALBUMSORT"),
-                metadata.get("ARTIST"),
-                metadata.get("ARTISTSORT"),
-                metadata.get("COMMENT"),
-                metadata.get("COPYRIGHT"),
-                metadata.get("DISCNUMBER"),
-                metadata.get("GENRE"),
-                metadata.get("ITUNESADVISORY"),
-                metadata.get("ITUNESALBUMID"),
-                metadata.get("ITUNESARTISTID"),
-                metadata.get("ITUNESCATALOGID"),
-                metadata.get("ITUNESGENREID"),
-                metadata.get("ITUNESMEDIATYPE"),
-                metadata.get("TITLE"),
-                metadata.get("TITLESORT"),
-                metadata.get("TOTALTRACKS"),
-                metadata.get("TRACK"),
-                metadata.get("YEAR")
-            )
+                    if os.path.exists(music_filepath):
+                        add_metadata(
+                            music_filepath,
+                            os.path.join(metadata_dir, 'artwork.jpg'),
+                            artists_list,
+                            metadata.get("ALBUM"),
+                            metadata.get("ALBUMARTIST"),
+                            metadata.get("ALBUMSORT"),
+                            metadata.get("ARTIST"),
+                            metadata.get("ARTISTSORT"),
+                            metadata.get("COMMENT"),
+                            metadata.get("COPYRIGHT"),
+                            metadata.get("DISCNUMBER"),
+                            metadata.get("GENRE"),
+                            metadata.get("ITUNESADVISORY"),
+                            metadata.get("ITUNESALBUMID"),
+                            metadata.get("ITUNESARTISTID"),
+                            metadata.get("ITUNESCATALOGID"),
+                            metadata.get("ITUNESGENREID"),
+                            metadata.get("ITUNESMEDIATYPE"),
+                            metadata.get("TITLE"),
+                            metadata.get("TITLESORT"),
+                            metadata.get("TOTALTRACKS"),
+                            metadata.get("TRACK"),
+                            metadata.get("YEAR")
+                        )
+                    else:
+                        update_progress(task_id, f'Error: Music file not found: {filename}', -1)
      
         update_progress(task_id, "Cleaning up...", 95)
         cleanup_metadata_dir(metadata_dir)
@@ -895,6 +951,7 @@ def home():
 
     form = SearchForm()
     confirm_form = ConfirmForm()
+    selected_tab = session.get('selected_tab', 'search')
 
     if request.method == 'GET':
         # Check if there's an active download in progress BEFORE clearing session
@@ -920,16 +977,23 @@ def home():
         if request.args.get('download') == 'success':
             flash('Download completed successfully')
 
-        if not request.args.get('from_redirect'):
+        if request.args.get('reset') == '1':
             session.pop('title', None)
             session.pop('artist', None)
             session.pop('current_search', None)
             session.pop('currentid', None)
             session.pop('single_song_only', None)
+            session.pop('selected_tab', None)
+            selected_tab = 'search'
             # Don't clear current_task here - it's handled above
-            print("GET request - session cleared")
+            print("GET request with reset=1 - session cleared")
 
     if request.method == 'POST':
+        apple_url_raw = (request.form.get('apple_url') or '').strip()
+        album_raw = (request.form.get('album') or '').strip()
+        artist_raw = (request.form.get('artist') or '').strip()
+        is_url_submit = 'download_from_url' in request.form or (apple_url_raw and 'search' not in request.form)
+        is_search_submit = 'search' in request.form or ((album_raw or artist_raw) and not is_url_submit)
         
         if 'yes' in request.form or 'no' in request.form:
 
@@ -938,7 +1002,7 @@ def home():
                 current_search = session.get('current_search')
                 if not current_search:
                     flash('No search data found. Please search again.')
-                    return render_template('home.html', form=form, confirm_form=confirm_form, active_page='Home')
+                    return render_template('home.html', form=form, confirm_form=confirm_form, active_page='Home', selected_tab='search')
 
                 task_id = str(uuid.uuid4())
                 session['current_task'] = task_id
@@ -968,19 +1032,70 @@ def home():
                 if not title or not artist:
 
                     flash('Search session expired. Please search again.')
-                    return render_template('home.html', form=form, confirm_form=confirm_form, active_page='Home')
+                    return render_template('home.html', form=form, confirm_form=confirm_form, active_page='Home', selected_tab='search')
                 
                 return show_search_results(form, confirm_form, title, artist, nextid)
-        
-        elif form.validate_on_submit():
 
-            title = form.album.data
-            artist = form.artist.data
+        elif is_url_submit:
+
+            if not form.validate_on_submit():
+                flash('Could not submit URL form. Please try again.')
+                return render_template('home.html', form=form, confirm_form=confirm_form, active_page='Home', selected_tab='url')
+
+            selected_tab = 'url'
+            session['selected_tab'] = selected_tab
+
+            apple_url = apple_url_raw
+            if not apple_url:
+                flash('Please paste an Apple Music URL.')
+                return render_template('home.html', form=form, confirm_form=confirm_form, active_page='Home', selected_tab=selected_tab)
+
+            if not is_valid_apple_music_url(apple_url):
+                flash('Please enter a valid Apple Music URL (music.apple.com).')
+                return render_template('home.html', form=form, confirm_form=confirm_form, active_page='Home', selected_tab=selected_tab)
+
+            task_id = str(uuid.uuid4())
+            target_song_id = get_apple_music_song_id(apple_url)
+            current_search = {
+                'title': '',
+                'artist': '',
+                'id': 0,
+                'single_song_only': bool(target_song_id),
+                'direct_url': apple_url,
+                'target_song_id': target_song_id
+            }
+            session['current_search'] = current_search
+            session['current_task'] = task_id
+
+            def run_download():
+                try:
+                    download_with_progress(current_search, task_id)
+                except Exception as e:
+                    print(f"Download thread error: {str(e)}")
+                    update_progress(task_id, f'Error: {str(e)}', -1)
+
+            thread = threading.Thread(target=run_download)
+            thread.daemon = True
+            thread.start()
+
+            return render_template('progress.html', active_page='Home', task_id=task_id)
+
+        elif is_search_submit:
+
+            if not form.validate_on_submit():
+                flash('Could not submit search form. Please try again.')
+                return render_template('home.html', form=form, confirm_form=confirm_form, active_page='Home', selected_tab='search')
+
+            selected_tab = 'search'
+            session['selected_tab'] = selected_tab
+
+            title = album_raw
+            artist = artist_raw
             single_song_only = form.single_song_only.data
                 
             if not title.strip() or not artist.strip():
                 flash('Please enter an album & artist name to search. Both are required.')
-                return render_template('home.html', form=form, confirm_form=confirm_form, active_page='Home')
+                return render_template('home.html', form=form, confirm_form=confirm_form, active_page='Home', selected_tab=selected_tab)
                 
             session['title'] = title
             session['artist'] = artist
@@ -989,7 +1104,7 @@ def home():
                 
             return show_search_results(form, confirm_form, title, artist, 0)
 
-    return render_template('home.html', form=form, confirm_form=confirm_form, active_page='Home')
+    return render_template('home.html', form=form, confirm_form=confirm_form, active_page='Home', selected_tab=selected_tab)
 
 @app.route('/settings')
 def settings():

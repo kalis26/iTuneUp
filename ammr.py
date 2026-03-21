@@ -10,6 +10,12 @@ import re
 import os
 import sys
 import contextlib
+
+# Fix Windows console encoding for non-ASCII characters (e.g. ∞ in song metadata)
+if sys.stdout and hasattr(sys.stdout, 'reconfigure'):
+    sys.stdout.reconfigure(encoding='utf-8', errors='replace')
+if sys.stderr and hasattr(sys.stderr, 'reconfigure'):
+    sys.stderr.reconfigure(encoding='utf-8', errors='replace')
 import unicodedata
 import urllib.parse
 import datetime
@@ -55,6 +61,9 @@ def get_yes_no(prompt):
 
 def ExtractAlbumID(url, id):
 
+    parsed_input = urllib.parse.urlparse(url)
+    target_song_id = urllib.parse.parse_qs(parsed_input.query).get('i', [None])[0]
+
     options = webdriver.ChromeOptions()
     options.add_experimental_option('excludeSwitches', ['enable-logging'])
     options.add_argument("--headless")
@@ -73,7 +82,34 @@ def ExtractAlbumID(url, id):
     'a[data-testid="click-action"][href*="?i="]'
     )
 
-    url = elements_with_class[id].get_attribute("href")
+    if not elements_with_class and target_song_id:
+        last_segment = parsed_input.path.rstrip('/').split('/')[-1]
+        if last_segment.isdigit():
+            ALBUMID = last_segment
+        else:
+            match = re.search(r'(\d+)(?!.*\d)', parsed_input.path)
+            ALBUMID = match.group(1) if match else ""
+        driver.quit()
+        return url, ALBUMID
+
+    if not elements_with_class:
+        driver.quit()
+        raise ValueError("Could not locate track links for this Apple Music page.")
+
+    if target_song_id:
+        matched_url = None
+        for elem in elements_with_class:
+            candidate_url = elem.get_attribute("href")
+            candidate_query = urllib.parse.parse_qs(urllib.parse.urlparse(candidate_url).query)
+            if candidate_query.get('i', [None])[0] == target_song_id:
+                matched_url = candidate_url
+                break
+        if matched_url:
+            url = matched_url
+        else:
+            url = elements_with_class[id].get_attribute("href")
+    else:
+        url = elements_with_class[id].get_attribute("href")
 
     parsed = urllib.parse.urlparse(url)
     last_segment = parsed.path.rstrip('/').split('/')[-1]
@@ -83,6 +119,7 @@ def ExtractAlbumID(url, id):
         match = re.search(r'(\d+)(?!.*\d)', parsed.path)
         ALBUMID = match.group(1) if match else ""
 
+    driver.quit()
     return url, ALBUMID
 
 # Function to extract the albums title
@@ -413,18 +450,21 @@ def ExtractMetadata(driver, id, metadata_dir):
         urls = re.findall(r'(https?://[^\s,]+)\s+\d+w', srcset)
         if urls:
             last_url = urls[-1]
-            img_data = requests.get(last_url).content
-            image_path = os.path.join(metadata_dir, 'artwork.jpg')
+            try:
+                img_data = requests.get(last_url, timeout=10).content
+                image_path = os.path.join(metadata_dir, 'artwork.jpg')
 
-            with open(image_path, 'wb') as handler:
-                handler.write(img_data)
+                with open(image_path, 'wb') as handler:
+                    handler.write(img_data)
+            except requests.exceptions.RequestException as e:
+                print(f"Failed to download artwork: {e}")
     
     driver.quit()
 
     return ALBUM, ALBUMARTIST
 
 
-def ExtractSingleSongMetadata(driver_url, id, metadata_dir, searched_title):
+def ExtractSingleSongMetadata(driver_url, id, metadata_dir, searched_title=None, target_song_id=None):
     """
     Extract metadata for only the song that matches the searched title.
     This downloads just that one song instead of the full album.
@@ -482,60 +522,77 @@ def ExtractSingleSongMetadata(driver_url, id, metadata_dir, searched_title):
     TOTALTRACKS = len(songs_elem)
 
     # Normalize the searched title for comparison
-    searched_title_lower = searched_title.lower().strip()
+    searched_title_lower = (searched_title or '').lower().strip()
     searched_words = set(searched_title_lower.split())
     
-    # Find the best matching song with tighter comparison
+    print(f"Searching for song: '{searched_title}' among {len(songs_elem)} tracks")
+    
+    def strip_extras(title):
+        """Strip parenthetical/bracket content like (feat. ...), [Deluxe], etc. for comparison."""
+        cleaned = re.sub(r'\s*[\(\[][^)\]]*[\)\]]', '', title)
+        cleaned = re.sub(r'\s*[-–—]\s*(feat|ft)\.?\s+.*$', '', cleaned, flags=re.IGNORECASE)
+        return cleaned.strip()
+    
+    searched_clean = strip_extras(searched_title_lower)
+    searched_clean_words = set(searched_clean.split())
+    
+    # Find the best matching song
     best_match = None
     best_match_score = 0
-    MIN_THRESHOLD = 0.7  # Minimum similarity score to accept a match
     
     for song in songs_elem:
+        if target_song_id:
+            try:
+                song_catalog_id = str(ExtractCatalogID(song))
+                if song_catalog_id == str(target_song_id):
+                    best_match = song
+                    best_match_score = 200
+                    break
+            except Exception:
+                pass
+
         TITLE = ExtractSongTitle(song)
         title_lower = TITLE.lower().strip()
-        title_words = set(title_lower.split())
+        title_clean = strip_extras(title_lower)
         
-        # Calculate match score using multiple criteria
-        score = 0
-        
-        # 1. Exact match - highest priority
-        if title_lower == searched_title_lower:
+        # 1. Exact match on full or cleaned title - highest priority
+        if searched_clean and (title_lower == searched_title_lower or title_clean == searched_clean):
             best_match = song
             best_match_score = 100
             break
         
-        # 2. Sequence similarity using difflib (0-1 ratio)
-        seq_ratio = difflib.SequenceMatcher(None, searched_title_lower, title_lower).ratio()
+        # 2. Check if searched title is fully contained in the song title (or vice versa)
+        if searched_clean and (searched_clean in title_clean or title_clean in searched_clean):
+            containment_score = 90
+            if containment_score > best_match_score:
+                best_match = song
+                best_match_score = containment_score
+                continue
         
-        # 3. Word overlap ratio
-        common_words = searched_words & title_words
-        word_overlap = len(common_words) / max(len(searched_words), len(title_words), 1)
+        # 3. Compare cleaned versions with difflib
+        seq_ratio = difflib.SequenceMatcher(None, searched_clean, title_clean).ratio()
         
-        # 4. Check if all searched words appear in title (order-independent)
-        all_words_present = searched_words.issubset(title_words)
+        # 4. Word overlap on cleaned titles
+        title_clean_words = set(title_clean.split())
+        common_words = searched_clean_words & title_clean_words
+        word_overlap = len(common_words) / max(len(searched_clean_words), 1)
         
-        # Weighted score: sequence similarity (60%) + word overlap (30%) + bonus for all words (10%)
-        score = (seq_ratio * 60) + (word_overlap * 30) + (10 if all_words_present else 0)
+        # 5. All searched words present in cleaned title
+        all_words_present = bool(searched_clean_words) and searched_clean_words.issubset(title_clean_words)
         
-        # Only consider if above minimum threshold
-        if score > best_match_score and seq_ratio >= MIN_THRESHOLD:
+        # Weighted score
+        score = (seq_ratio * 50) + (word_overlap * 30) + (20 if all_words_present else 0)
+        
+        if searched_clean and score > best_match_score and seq_ratio >= 0.5:
             best_match = song
             best_match_score = score
     
-    # If no good match found, try to find the closest match above a lower threshold
-    if best_match is None and songs_elem:
-        fallback_threshold = 0.5
-        for song in songs_elem:
-            TITLE = ExtractSongTitle(song)
-            title_lower = TITLE.lower().strip()
-            seq_ratio = difflib.SequenceMatcher(None, searched_title_lower, title_lower).ratio()
-            if seq_ratio >= fallback_threshold and seq_ratio * 100 > best_match_score:
-                best_match = song
-                best_match_score = seq_ratio * 100
-    
     if best_match is None:
+        print(f"No matching song found for '{searched_title}'")
         driver.quit()
         return ALBUM, ALBUMARTIST
+    
+    print(f"Best match found: '{ExtractSongTitle(best_match)}' (score: {best_match_score:.1f})")
     
     # Extract metadata for the matched song only
     song = best_match
@@ -590,11 +647,14 @@ def ExtractSingleSongMetadata(driver_url, id, metadata_dir, searched_title):
     urls = re.findall(r'(https?://[^\s,]+)\s+\d+w', srcset)
     if urls:
         last_url = urls[-1]
-        img_data = requests.get(last_url).content
-        image_path = os.path.join(metadata_dir, 'artwork.jpg')
+        try:
+            img_data = requests.get(last_url, timeout=10).content
+            image_path = os.path.join(metadata_dir, 'artwork.jpg')
 
-        with open(image_path, 'wb') as handler:
-            handler.write(img_data)
+            with open(image_path, 'wb') as handler:
+                handler.write(img_data)
+        except requests.exceptions.RequestException as e:
+            print(f"Failed to download artwork: {e}")
 
     driver.quit()
 

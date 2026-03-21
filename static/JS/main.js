@@ -78,13 +78,6 @@ class StorageManager {
 
 const storage = new StorageManager();
 
-const wrapper = document.querySelector('.form-container');
-const searchButton = document.querySelector('.form-button-container');
-const searchResultContainer = document.querySelector('.search-result-container');
-const yesBtnContainer = document.querySelector('.yes-button-container');
-const noBtnContainer = document.querySelector('.no-button-container');
-const flashBtnContainer = document.querySelector('.flash-button-container');
-const startSearchbtn = document.querySelector('.start-searching-btn-container');
 const libraryContainer = document.getElementById('libraryContainer');
 
 function isDarkMode() {
@@ -103,127 +96,6 @@ function toggleDarkMode() {
     
     console.log('Theme changed to:', newTheme || 'light');
 }
-
-function getThemeColors() {
-    if (isDarkMode()) {
-        return {
-            wrapper: {
-                start: '#2C2C2E',
-                end: '#1C1C1E'
-            },
-            button: {
-                start: '#0A84FF',
-                end: '#007AFF'
-            },
-            searchResult: {
-                start: '#2C2C2E',
-                end: '#3A3A3C'
-            },
-            noButton: {
-                start: '#3A3A3C',
-                end: '#48484A'
-            }
-        };
-    } else {
-        return {
-            wrapper: {
-                start: '#FFFFFF',
-                end: '#F5F5F5'
-            },
-            button: {
-                start: '#0091FF',
-                end: '#00ffea'
-            },
-            searchResult: {
-                start: '#F5F5F5',
-                end: '#ececec'
-            },
-            noButton: {
-                start: '#F7F7F7',
-                end: '#0000001a'
-            }
-        };
-    }
-}
-
-document.addEventListener('mousemove', (e) => {
-
-    colors = getThemeColors();
-
-    if (wrapper) {
-        const rect = wrapper.getBoundingClientRect();
-        const x = e.clientX - rect.left;
-        const y = e.clientY - rect.top;
-
-        const angle = Math.atan2(y - rect.height / 2, x - rect.width / 2) * (180 / Math.PI);
-        wrapper.style.background = `linear-gradient(${angle}deg, ${colors.wrapper.start}, ${colors.wrapper.end})`;
-    }
-    
-    if (searchButton && !searchButton.classList.contains('disabled')) {
-        const buttonRect = searchButton.getBoundingClientRect();
-        const buttonX = e.clientX - buttonRect.left;
-        const buttonY = e.clientY - buttonRect.top;
-
-        const buttonAngle = Math.atan2(buttonY - buttonRect.height / 2, buttonX - buttonRect.width / 2) * (180 / Math.PI);
-        searchButton.style.background = `linear-gradient(${buttonAngle}deg, ${colors.button.start}, ${colors.button.end})`;
-    }
-
-    if (searchResultContainer) {
-        const resultRect = searchResultContainer.getBoundingClientRect();
-        const resultX = e.clientX - resultRect.left;
-        const resultY = e.clientY - resultRect.top;
-
-        const resultAngle = Math.atan2(resultY - resultRect.height / 2, resultX - resultRect.width / 2) * (180 / Math.PI);
-        searchResultContainer.style.background = `linear-gradient(${resultAngle}deg, ${colors.searchResult.start}, ${colors.searchResult.end})`;
-
-    }    
-
-    if (yesBtnContainer) {
-        const yesRect = yesBtnContainer.getBoundingClientRect();
-        const yesX = e.clientX - yesRect.left;
-        const yesY = e.clientY - yesRect.top;
-
-        const yesAngle = Math.atan2(yesY - yesRect.height / 2, yesX - yesRect.width / 2) * (180 / Math.PI);
-        yesBtnContainer.style.background = `linear-gradient(${yesAngle}deg, ${colors.button.start}, ${colors.button.end})`;
-    }
-
-    if (noBtnContainer) {
-        const noRect = noBtnContainer.getBoundingClientRect();
-        const noX = e.clientX - noRect.left;
-        const noY = e.clientY - noRect.top;
-
-        const noAngle = Math.atan2(noY - noRect.height / 2, noX - noRect.width / 2) * (180 / Math.PI);
-        noBtnContainer.style.background = `linear-gradient(${noAngle}deg, ${colors.noButton.start}, ${colors.noButton.end})`;
-    }
-
-    if (flashBtnContainer) {
-        const flashRect = flashBtnContainer.getBoundingClientRect();
-        const flashX = e.clientX - flashRect.left;
-        const flashY = e.clientY - flashRect.top;
-
-        const flashAngle = Math.atan2(flashY - flashRect.height / 2, flashX - flashRect.width / 2) * (180 / Math.PI);
-        flashBtnContainer.style.background = `linear-gradient(${flashAngle}deg, ${colors.button.start}, ${colors.button.end})`;
-    }
-
-    if (startSearchbtn) {
-        const stsRect = startSearchbtn.getBoundingClientRect();
-        const stsX = e.clientX - stsRect.left;
-        const stsY = e.clientY - stsRect.top;
-
-        const stsAngle = Math.atan2(stsY - stsRect.height / 2, stsX - stsRect.width / 2) * (180 / Math.PI);
-        startSearchbtn.style.background = `linear-gradient(${stsAngle}deg, ${colors.button.start}, ${colors.button.end})`;
-    }
-
-});
-
-document.addEventListener('themechange', function() {
-    const elements = [wrapper, searchButton, searchResultContainer, yesBtnContainer, noBtnContainer, flashBtnContainer, startSearchbtn];
-    elements.forEach(element => {
-        if (element) {
-            element.style.background = '';
-        }
-    });
-});
 
 function closeFlash() {
 
@@ -280,10 +152,46 @@ document.addEventListener('DOMContentLoaded', function() {
 
     const searchBtn = document.getElementById('search-btn');
     const loadingGif = document.getElementById('loading-gif');
-    const form = document.querySelector('form');
+    const searchForm = document.getElementById('home-search-form');
+    const urlForm = document.getElementById('home-url-form');
+    const urlDownloadBtn = document.getElementById('url-download-btn');
+    const urlLoadingGif = document.getElementById('url-loading-gif');
     const flashOverlay = document.getElementById('flashOverlay');
     const confirmForm = document.getElementById('confirm-form');
     const darkModeToggle = document.getElementById('dark-mode-toggle');
+    const tabButtons = document.querySelectorAll('.home-tab-button');
+    const tabPanels = {
+        search: document.getElementById('search-tab-panel'),
+        url: document.getElementById('url-tab-panel')
+    };
+
+    function setActiveTab(tabName) {
+        tabButtons.forEach(button => {
+            button.classList.toggle('active', button.dataset.tabTarget === tabName);
+        });
+
+        Object.keys(tabPanels).forEach(key => {
+            if (tabPanels[key]) {
+                tabPanels[key].classList.toggle('active', key === tabName);
+            }
+        });
+    }
+
+    tabButtons.forEach(button => {
+        button.addEventListener('click', function() {
+            const targetTab = this.dataset.tabTarget;
+            if (targetTab) {
+                setActiveTab(targetTab);
+            }
+        });
+    });
+
+    const initiallyActiveButton = document.querySelector('.home-tab-button.active');
+    if (initiallyActiveButton && initiallyActiveButton.dataset.tabTarget) {
+        setActiveTab(initiallyActiveButton.dataset.tabTarget);
+    } else {
+        setActiveTab('search');
+    }
     
     if (darkModeToggle) {
         darkModeToggle.addEventListener('change', toggleDarkMode);
@@ -300,8 +208,8 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
 
-    if (form && searchBtn) {
-        form.addEventListener('submit', function(e) {
+    if (searchForm && searchBtn) {
+        searchForm.addEventListener('submit', function(e) {
             
             const submitButton = e.submitter;
             if (submitButton && submitButton.id == 'search-btn') {
@@ -329,8 +237,37 @@ document.addEventListener('DOMContentLoaded', function() {
         searchBtn.textContent = 'Search';
     }
 
+    if (urlForm && urlDownloadBtn) {
+        urlForm.addEventListener('submit', function(e) {
+            const submitButton = e.submitter;
+            if (submitButton && submitButton.id === 'url-download-btn') {
+                urlDownloadBtn.disabled = true;
+                urlDownloadBtn.classList.add('loading');
+                urlDownloadBtn.textContent = 'Starting...';
+
+                const urlButtonContainer = document.getElementById('url-button-container');
+                if (urlButtonContainer) {
+                    urlButtonContainer.classList.add('disabled');
+                    urlButtonContainer.style.background = '#A0A0A0';
+                }
+
+                if (urlLoadingGif) {
+                    urlLoadingGif.classList.add('show');
+                }
+            }
+        });
+
+        urlDownloadBtn.disabled = false;
+        urlDownloadBtn.classList.remove('loading');
+        urlDownloadBtn.textContent = 'Download From URL';
+    }
+
     if (loadingGif) {
         loadingGif.classList.remove('show');
+    }
+
+    if (urlLoadingGif) {
+        urlLoadingGif.classList.remove('show');
     }
 
 
