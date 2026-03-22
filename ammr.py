@@ -64,6 +64,14 @@ def ExtractAlbumID(url, id):
     parsed_input = urllib.parse.urlparse(url)
     target_song_id = urllib.parse.parse_qs(parsed_input.query).get('i', [None])[0]
 
+    # Apple Music album/song URLs already contain the album catalog id in the path.
+    # Prefer this fast path so we do not depend on fragile track-link selectors.
+    path_match = re.search(r'(\d+)(?!.*\d)', parsed_input.path)
+    input_album_id = path_match.group(1) if path_match else ""
+    if '/album/' in parsed_input.path.lower() and input_album_id:
+        album_url = urllib.parse.urlunparse(parsed_input._replace(query='', fragment=''))
+        return album_url, input_album_id
+
     options = webdriver.ChromeOptions()
     options.add_experimental_option('excludeSwitches', ['enable-logging'])
     options.add_argument("--headless")
@@ -75,52 +83,50 @@ def ExtractAlbumID(url, id):
     with suppress_stderr():
         driver = webdriver.Chrome(service=service, options=options)
 
-    driver.get(url)
+    try:
+        driver.get(url)
 
-    elements_with_class = driver.find_elements(
-    By.CSS_SELECTOR,
-    'a[data-testid="click-action"][href*="?i="]'
-    )
+        elements_with_class = driver.find_elements(
+        By.CSS_SELECTOR,
+        'a[data-testid="click-action"][href*="?i="]'
+        )
 
-    if not elements_with_class and target_song_id:
-        last_segment = parsed_input.path.rstrip('/').split('/')[-1]
+        if elements_with_class:
+            if target_song_id:
+                matched_url = None
+                for elem in elements_with_class:
+                    candidate_url = elem.get_attribute("href")
+                    candidate_query = urllib.parse.parse_qs(urllib.parse.urlparse(candidate_url).query)
+                    if candidate_query.get('i', [None])[0] == target_song_id:
+                        matched_url = candidate_url
+                        break
+                if matched_url:
+                    url = matched_url
+                else:
+                    url = elements_with_class[id].get_attribute("href")
+            else:
+                url = elements_with_class[id].get_attribute("href")
+
+        parsed = urllib.parse.urlparse(url)
+        last_segment = parsed.path.rstrip('/').split('/')[-1]
         if last_segment.isdigit():
             ALBUMID = last_segment
         else:
-            match = re.search(r'(\d+)(?!.*\d)', parsed_input.path)
+            match = re.search(r'(\d+)(?!.*\d)', parsed.path)
             ALBUMID = match.group(1) if match else ""
-        driver.quit()
+
+        # If we still cannot derive an album id and there are no candidate track links,
+        # this is likely not an album/single page we can process.
+        if not ALBUMID and not elements_with_class:
+            raise ValueError("Could not locate track links for this Apple Music page.")
+
+        # Normalize to album page URL if we can derive it from a song URL.
+        if '/album/' in parsed.path.lower() and ALBUMID:
+            url = urllib.parse.urlunparse(parsed._replace(query='', fragment=''))
+
         return url, ALBUMID
-
-    if not elements_with_class:
+    finally:
         driver.quit()
-        raise ValueError("Could not locate track links for this Apple Music page.")
-
-    if target_song_id:
-        matched_url = None
-        for elem in elements_with_class:
-            candidate_url = elem.get_attribute("href")
-            candidate_query = urllib.parse.parse_qs(urllib.parse.urlparse(candidate_url).query)
-            if candidate_query.get('i', [None])[0] == target_song_id:
-                matched_url = candidate_url
-                break
-        if matched_url:
-            url = matched_url
-        else:
-            url = elements_with_class[id].get_attribute("href")
-    else:
-        url = elements_with_class[id].get_attribute("href")
-
-    parsed = urllib.parse.urlparse(url)
-    last_segment = parsed.path.rstrip('/').split('/')[-1]
-    if last_segment.isdigit():
-        ALBUMID = last_segment
-    else:
-        match = re.search(r'(\d+)(?!.*\d)', parsed.path)
-        ALBUMID = match.group(1) if match else ""
-
-    driver.quit()
-    return url, ALBUMID
 
 # Function to extract the albums title
 
