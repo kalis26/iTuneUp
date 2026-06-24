@@ -12,6 +12,7 @@ from forms import SearchForm, ConfirmForm
 from selenium import webdriver
 from selenium.webdriver.common.by import By
 from selenium.webdriver.chrome.service import Service
+from selenium.webdriver.chrome.options import Options as ChromeOptions
 from selenium.common.exceptions import NoSuchElementException
 from webdriver_manager.chrome import ChromeDriverManager
 from mutagen.mp4 import MP4, MP4FreeForm, MP4Cover
@@ -120,7 +121,7 @@ setup_ffmpeg()
 
 def create_safe_driver():
     try:
-        options = webdriver.ChromeOptions()
+        options = ChromeOptions()
         options.add_argument("--headless")
         options.add_argument("--no-sandbox")
         options.add_argument("--disable-dev-shm-usage")
@@ -1167,7 +1168,7 @@ def _capture_deezer_session(connection_id):
     """Let the user sign in in a visible Chrome window, then retain its Deezer session."""
     driver = None
     try:
-        options = webdriver.ChromeOptions()
+        options = ChromeOptions()
         options.add_experimental_option('excludeSwitches', ['enable-logging'])
         options.add_argument('--disable-notifications')
         service = Service(ChromeDriverManager().install(), log_path=os.devnull)
