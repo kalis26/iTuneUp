@@ -130,7 +130,31 @@ function showNoLoading() {
     }
 }
 
+function dismissDeezerPrompt() {
+    const modal = document.getElementById('deezerConnectModal');
+    if (modal) modal.style.display = 'none';
+    sessionStorage.setItem('deezerConnectPromptShown', 'true');
+}
+
+function openDeezerSettings() {
+    window.location.href = '/settings';
+}
+
+async function promptForDeezerConnection() {
+    const modal = document.getElementById('deezerConnectModal');
+    if (!modal || sessionStorage.getItem('deezerConnectPromptShown') === 'true') return;
+    try {
+        const response = await fetch('/api/deezer/status');
+        const status = await response.json();
+        if (!status.connected) modal.style.display = 'flex';
+    } catch (_) {
+        // Do not block app startup when connection status cannot be checked.
+    }
+}
+
 document.addEventListener('DOMContentLoaded', function() {
+
+    promptForDeezerConnection();
 
     if (!storage.isLocalStorageAvailable) {
         storage.loadFromServer().then(settings => {

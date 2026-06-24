@@ -201,6 +201,19 @@
         </div>
     </div>
 
+    {% if active_page == 'Home' %}
+    <div id="deezerConnectModal" class="modal-overlay" style="display: none;" role="dialog" aria-modal="true" aria-labelledby="deezerConnectTitle">
+        <div class="modal-content">
+            <h3 id="deezerConnectTitle">Connect Deezer</h3>
+            <p>Connect your Deezer account before downloading music. iTuneUp will open Deezer’s normal sign-in page and connect automatically after you sign in.</p>
+            <div class="modal-buttons">
+                <button class="btn-cancel" onclick="dismissDeezerPrompt()">Not now</button>
+                <button class="btn-confirm deezer-connect-prompt" onclick="openDeezerSettings()">Connect Deezer</button>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+
     {% block scripts %}
 
     {% endblock %}

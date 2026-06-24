@@ -1756,6 +1756,14 @@ body.flash-active > *:not(.flash-overlay) {
     background: #D70015;
 }
 
+.deezer-connect-prompt {
+    background: #007AFF;
+}
+
+.deezer-connect-prompt:hover {
+    background: #0056CC;
+}
+
 .open-folder-btn {
     display: flex;
     align-items: flex-start;
