@@ -13,7 +13,7 @@ import base64
 import re
 import unicodedata
 from typing import Iterable, Optional, Protocol
-from urllib.parse import urljoin, urlparse
+from urllib.parse import unquote, urljoin, urlparse
 
 import requests
 
@@ -113,6 +113,19 @@ def arl_from_browser_cookie(cookie: Optional[dict]) -> str:
     if not re.fullmatch(r'[0-9a-fA-F]+', value):
         raise DeezerAuthenticationError('Deezer sign-in did not create a usable session.')
     return value
+
+
+def cbc_secret_from_script(script: str) -> str:
+    """Derive Deezer's 16-byte decoder value from its current web-player asset."""
+    decoded = unquote(script)
+    encoded_arrays = re.findall(r'\[(?:0x[0-9a-fA-F]{1,2})(?:,0x[0-9a-fA-F]{1,2}){7}\]', decoded)
+    blocks = [[int(value, 16) for value in re.findall(r'0x([0-9a-fA-F]{1,2})', item)] for item in encoded_arrays]
+    order = (7, 15, 6, 14, 5, 13, 4, 12, 3, 11, 2, 10, 1, 9, 0, 8)
+    for first, second in zip(blocks, blocks[1:]):
+        candidate = ''.join(chr((first + second)[index]) for index in order)
+        if re.fullmatch(r'[a-z0-9]{16}', candidate):
+            return candidate
+    raise DeezerDecodeError('Could not initialize the Deezer decoder. Please try again later.')
 
 
 def normalize(value: str) -> str:
@@ -240,14 +253,7 @@ class DeezerClient:
         if not script_url:
             raise DeezerDecodeError("Could not initialize the Deezer decoder. Please try again later.")
         script = self.http.get(urljoin('https://www.deezer.com', script_url.group(1)), timeout=20).text
-        encoded = re.search(r'(%5B0x..%2C.{39}%2C0x..%5D)', script)
-        if not encoded:
-            raise DeezerDecodeError("Could not initialize the Deezer decoder. Please try again later.")
-        values = re.findall(r"%([0-9A-Fa-f]{2})", encoded.group(1))
-        chars = [chr(int(value, 16)) for value in values]
-        if len(chars) < 16:
-            raise DeezerDecodeError("Could not initialize the Deezer decoder. Please try again later.")
-        return "".join(chars[index] for index in (7, 15, 6, 14, 5, 13, 4, 12, 3, 11, 2, 10, 1, 9, 0, 8))
+        return cbc_secret_from_script(script)
 
     def download_mp3(self, track_id: int, destination: Path) -> None:
         try:

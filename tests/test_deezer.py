@@ -1,6 +1,6 @@
 import unittest
 
-from deezer import AppleTrackMetadata, DeezerCandidate, DeezerAuthenticationError, arl_from_browser_cookie, arl_from_callback, score_candidate, normalize
+from deezer import AppleTrackMetadata, DeezerCandidate, DeezerAuthenticationError, arl_from_browser_cookie, arl_from_callback, cbc_secret_from_script, score_candidate, normalize
 
 
 class DeezerMatchingTests(unittest.TestCase):
@@ -34,6 +34,10 @@ class DeezerMatchingTests(unittest.TestCase):
         self.assertEqual(arl_from_browser_cookie({'name': 'arl', 'value': 'a1b2c3d4'}), 'a1b2c3d4')
         with self.assertRaises(DeezerAuthenticationError):
             arl_from_browser_cookie(None)
+
+    def test_current_web_player_decoder_shape_is_supported(self):
+        script = 'const first=[0x61,0x39,0x76,0x30,0x77,0x35,0x65,0x67],second=[0x31,0x6e,0x66,0x7a,0x63,0x38,0x6c,0x34];'
+        self.assertEqual(cbc_secret_from_script(script), 'g4el58wc0zvf9na1')
 
 
 if __name__ == '__main__':
