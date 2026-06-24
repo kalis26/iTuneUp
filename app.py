@@ -17,7 +17,7 @@ from webdriver_manager.chrome import ChromeDriverManager
 from mutagen.mp4 import MP4, MP4FreeForm, MP4Cover
 from pydub import AudioSegment
 from ammr import ExtractMetadata, ExtractSingleSongMetadata
-from deezer import AppleTrackMetadata, DeezerClient, DeezerError, arl_from_callback
+from deezer import AppleTrackMetadata, DeezerClient, DeezerError, arl_from_browser_cookie
 import re
 import threading
 import time
@@ -1163,8 +1163,8 @@ def _set_deezer_connection(connection_id, **values):
         deezer_connections.setdefault(connection_id, {}).update(values)
 
 
-def _capture_deezer_callback(connection_id):
-    """Let the user sign in in a visible Chrome window, then read—not open—the callback link."""
+def _capture_deezer_session(connection_id):
+    """Let the user sign in in a visible Chrome window, then retain its Deezer session."""
     driver = None
     try:
         options = webdriver.ChromeOptions()
@@ -1172,13 +1172,13 @@ def _capture_deezer_callback(connection_id):
         options.add_argument('--disable-notifications')
         service = Service(ChromeDriverManager().install(), log_path=os.devnull)
         driver = webdriver.Chrome(service=service, options=options)
-        driver.get('https://www.deezer.com/desktop/login/electron/callback')
+        driver.get('https://www.deezer.com/login')
         _set_deezer_connection(connection_id, state='waiting', message='Complete Deezer sign-in in the browser window…')
         deadline = time.time() + 600
         while time.time() < deadline:
-            links = driver.find_elements(By.CSS_SELECTOR, "a[href^='deezer://']")
-            if links:
-                arl = arl_from_callback(links[0].get_attribute('href'))
+            cookie = driver.get_cookie('arl')
+            if cookie:
+                arl = arl_from_browser_cookie(cookie)
                 DeezerClient().validate_and_save(arl)
                 _set_deezer_connection(connection_id, state='connected', message='Deezer account connected.')
                 return
@@ -1197,7 +1197,7 @@ def _capture_deezer_callback(connection_id):
 def start_deezer_connect():
     connection_id = str(uuid.uuid4())
     _set_deezer_connection(connection_id, state='starting', message='Opening Deezer sign-in…')
-    thread = threading.Thread(target=_capture_deezer_callback, args=(connection_id,), daemon=True)
+    thread = threading.Thread(target=_capture_deezer_session, args=(connection_id,), daemon=True)
     thread.start()
     return jsonify({'connection_id': connection_id})
 

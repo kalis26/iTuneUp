@@ -107,6 +107,14 @@ def arl_from_callback(callback_url: str) -> str:
     return segments[0]
 
 
+def arl_from_browser_cookie(cookie: Optional[dict]) -> str:
+    """Validate the Deezer session cookie collected after a user completes login."""
+    value = (cookie or {}).get('value', '')
+    if not re.fullmatch(r'[0-9a-fA-F]+', value):
+        raise DeezerAuthenticationError('Deezer sign-in did not create a usable session.')
+    return value
+
+
 def normalize(value: str) -> str:
     value = unicodedata.normalize("NFKD", value or "")
     value = "".join(c for c in value if not unicodedata.combining(c)).lower()

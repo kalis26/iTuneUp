@@ -1,6 +1,6 @@
 import unittest
 
-from deezer import AppleTrackMetadata, DeezerCandidate, DeezerAuthenticationError, arl_from_callback, score_candidate, normalize
+from deezer import AppleTrackMetadata, DeezerCandidate, DeezerAuthenticationError, arl_from_browser_cookie, arl_from_callback, score_candidate, normalize
 
 
 class DeezerMatchingTests(unittest.TestCase):
@@ -29,6 +29,11 @@ class DeezerMatchingTests(unittest.TestCase):
     def test_non_deezer_callback_is_rejected(self):
         with self.assertRaises(DeezerAuthenticationError):
             arl_from_callback('https://example.test/callback')
+
+    def test_browser_session_cookie_is_validated(self):
+        self.assertEqual(arl_from_browser_cookie({'name': 'arl', 'value': 'a1b2c3d4'}), 'a1b2c3d4')
+        with self.assertRaises(DeezerAuthenticationError):
+            arl_from_browser_cookie(None)
 
 
 if __name__ == '__main__':
