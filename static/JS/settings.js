@@ -38,14 +38,27 @@ async function loadDeezerStatus() {
 }
 
 async function connectDeezer() {
-    const input = document.getElementById('deezer-arl');
     const message = document.getElementById('deezer-message');
-    message.textContent = 'Validating Deezer account…';
-    const response = await fetch('/api/deezer/session', {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({arl: input.value})});
+    const connect = document.getElementById('deezer-connect');
+    connect.disabled = true;
+    message.textContent = 'Opening Deezer sign-in…';
+    const response = await fetch('/api/deezer/connect', {method: 'POST'});
     const data = await response.json();
-    input.value = '';
-    message.textContent = data.message || (data.success ? 'Deezer account connected.' : 'Could not connect Deezer account.');
-    loadDeezerStatus();
+    if (!response.ok) {
+        message.textContent = data.message || 'Could not start Deezer sign-in.';
+        connect.disabled = false;
+        return;
+    }
+    const poll = setInterval(async () => {
+        const statusResponse = await fetch(`/api/deezer/connect/${data.connection_id}`);
+        const status = await statusResponse.json();
+        message.textContent = status.message || 'Waiting for Deezer sign-in…';
+        if (status.state === 'connected' || status.state === 'failed') {
+            clearInterval(poll);
+            connect.disabled = false;
+            loadDeezerStatus();
+        }
+    }, 1000);
 }
 
 async function disconnectDeezer() {

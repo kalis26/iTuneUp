@@ -13,7 +13,7 @@ import base64
 import re
 import unicodedata
 from typing import Iterable, Optional, Protocol
-from urllib.parse import urljoin
+from urllib.parse import urljoin, urlparse
 
 import requests
 
@@ -94,6 +94,17 @@ class KeyringCredentialStore:
             self._keyring().delete_password(self.SERVICE, self.ACCOUNT)
         except Exception:
             pass
+
+
+def arl_from_callback(callback_url: str) -> str:
+    """Extract the ARL from dzr's Deezer desktop callback link without logging it."""
+    parsed = urlparse((callback_url or '').strip())
+    if parsed.scheme != 'deezer':
+        raise DeezerAuthenticationError('The Deezer sign-in callback was not recognized.')
+    segments = [segment for segment in parsed.path.split('/') if segment]
+    if not segments or not re.fullmatch(r'[0-9a-fA-F]+', segments[0]):
+        raise DeezerAuthenticationError('The Deezer sign-in callback did not contain a valid session.')
+    return segments[0]
 
 
 def normalize(value: str) -> str:

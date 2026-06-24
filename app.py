@@ -17,7 +17,7 @@ from webdriver_manager.chrome import ChromeDriverManager
 from mutagen.mp4 import MP4, MP4FreeForm, MP4Cover
 from pydub import AudioSegment
 from ammr import ExtractMetadata, ExtractSingleSongMetadata
-from deezer import AppleTrackMetadata, DeezerClient, DeezerError
+from deezer import AppleTrackMetadata, DeezerClient, DeezerError, arl_from_callback
 import re
 import threading
 import time
@@ -466,6 +466,8 @@ def show_search_results(form, confirm_form, title, artist, searchid):
         driver.quit()
 
 download_progress = {}
+deezer_connections = {}
+deezer_connections_lock = threading.Lock()
 
 def update_progress(task_id, message, percentage):
 
@@ -1154,6 +1156,59 @@ def deezer_status():
         return jsonify({'connected': DeezerClient().is_connected()})
     except DeezerError as exc:
         return jsonify({'connected': False, 'message': str(exc)}), 503
+
+
+def _set_deezer_connection(connection_id, **values):
+    with deezer_connections_lock:
+        deezer_connections.setdefault(connection_id, {}).update(values)
+
+
+def _capture_deezer_callback(connection_id):
+    """Let the user sign in in a visible Chrome window, then read—not open—the callback link."""
+    driver = None
+    try:
+        options = webdriver.ChromeOptions()
+        options.add_experimental_option('excludeSwitches', ['enable-logging'])
+        options.add_argument('--disable-notifications')
+        service = Service(ChromeDriverManager().install(), log_path=os.devnull)
+        driver = webdriver.Chrome(service=service, options=options)
+        driver.get('https://www.deezer.com/desktop/login/electron/callback')
+        _set_deezer_connection(connection_id, state='waiting', message='Complete Deezer sign-in in the browser window…')
+        deadline = time.time() + 600
+        while time.time() < deadline:
+            links = driver.find_elements(By.CSS_SELECTOR, "a[href^='deezer://']")
+            if links:
+                arl = arl_from_callback(links[0].get_attribute('href'))
+                DeezerClient().validate_and_save(arl)
+                _set_deezer_connection(connection_id, state='connected', message='Deezer account connected.')
+                return
+            time.sleep(1)
+        _set_deezer_connection(connection_id, state='failed', message='Deezer sign-in timed out. Please try again.')
+    except DeezerError as exc:
+        _set_deezer_connection(connection_id, state='failed', message=str(exc))
+    except Exception:
+        _set_deezer_connection(connection_id, state='failed', message='Could not start Deezer sign-in. Check Chrome and your connection.')
+    finally:
+        if driver:
+            driver.quit()
+
+
+@app.route('/api/deezer/connect', methods=['POST'])
+def start_deezer_connect():
+    connection_id = str(uuid.uuid4())
+    _set_deezer_connection(connection_id, state='starting', message='Opening Deezer sign-in…')
+    thread = threading.Thread(target=_capture_deezer_callback, args=(connection_id,), daemon=True)
+    thread.start()
+    return jsonify({'connection_id': connection_id})
+
+
+@app.route('/api/deezer/connect/<connection_id>')
+def deezer_connect_status(connection_id):
+    with deezer_connections_lock:
+        result = deezer_connections.get(connection_id)
+    if not result:
+        return jsonify({'state': 'failed', 'message': 'Deezer sign-in request was not found.'}), 404
+    return jsonify(result)
 
 @app.route('/api/deezer/session', methods=['POST'])
 def save_deezer_session():
