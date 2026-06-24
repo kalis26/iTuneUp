@@ -18,6 +18,9 @@
 desktop.ini
 
 build/
+build-debug/
+dist/
+dist-debug/
 setup/
 ffmpeg/
 
