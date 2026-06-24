@@ -15,9 +15,9 @@ from selenium.webdriver.chrome.service import Service
 from selenium.common.exceptions import NoSuchElementException
 from webdriver_manager.chrome import ChromeDriverManager
 from mutagen.mp4 import MP4, MP4FreeForm, MP4Cover
-import yt_dlp
 from pydub import AudioSegment
 from ammr import ExtractMetadata, ExtractSingleSongMetadata
+from deezer import AppleTrackMetadata, DeezerClient, DeezerError
 import re
 import threading
 import time
@@ -28,6 +28,8 @@ import webview
 import json
 import subprocess
 import platform
+import shutil
+from pathlib import Path
 from urllib.parse import urlparse, parse_qs
 
 
@@ -95,24 +97,6 @@ def get_ffprobe_path():
     
     # Fallback
     return "ffprobe"
-
-
-def get_deno_path():
-    """Get the path to Deno executable."""
-    app_dir = get_app_directory()
-    
-    # Check in app directory
-    deno_path = os.path.join(app_dir, 'deno.exe')
-    if os.path.exists(deno_path):
-        return deno_path
-    
-    # Check in resources subfolder (for development)
-    deno_path = os.path.join(app_dir, 'resources', 'deno.exe')
-    if os.path.exists(deno_path):
-        return deno_path
-    
-    # Fallback
-    return None
 
 
 def setup_ffmpeg():
@@ -303,52 +287,6 @@ def recover_metadata(file_path):
 
     return metadata
 
-def download_as_mp3(youtube_url, library_dir, title, tracktitle, index, max_retries=3):
-
-    # Get paths to external tools
-    deno_path = get_deno_path()
-    ffmpeg_path = get_ffmpeg_path()
-    
-    ydl_opts = {
-        'format': 'bestaudio/best',
-        'outtmpl': os.path.join(library_dir, f'{title}/{index} {tracktitle}.%(ext)s'),
-        'postprocessors': [{
-            'key': 'FFmpegExtractAudio',
-            'preferredcodec': 'mp3',
-            'preferredquality': '320',
-        }],
-        'quiet': True,
-        'noplaylist': True,
-        # Network reliability options
-        'retries': 10,
-        'fragment_retries': 10,
-        'socket_timeout': 30,
-        'extractor_retries': 5,
-        'file_access_retries': 5,
-        # Fallback if preferred format unavailable
-        'ignoreerrors': False,
-    }
-    
-    # Use bundled FFmpeg if available
-    if ffmpeg_path:
-        ydl_opts['ffmpeg_location'] = os.path.dirname(ffmpeg_path)
-    
-    # Use bundled Deno if available
-    if deno_path:
-        ydl_opts['extractor_args'] = {'youtube': {'js_runtimes': f'deno:{deno_path}'}}
-
-    for attempt in range(max_retries):
-        try:
-            with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-                ydl.extract_info(youtube_url, download=True)
-            return  # Success, exit the function
-        except Exception as e:
-            print(f"yt-dlp error (attempt {attempt + 1}/{max_retries}): {e}")
-            if attempt < max_retries - 1:
-                time.sleep(2 ** attempt)  # Exponential backoff: 1s, 2s, 4s
-            else:
-                raise RuntimeError(f"Failed to download after {max_retries} attempts: {tracktitle}")
-
 def convert_all_mp3_to_m4a(folder_path, task_id, delete_original=False):
 
     # Re-setup FFmpeg paths at runtime to ensure they're correct after PyInstaller extraction
@@ -537,7 +475,7 @@ def update_progress(task_id, message, percentage):
         'timestamp': time.time()
     }
 
-def download_with_progress(current_search, task_id):
+def _legacy_download_with_progress(current_search, task_id):
 
     try:
 
@@ -807,6 +745,110 @@ def download_with_progress(current_search, task_id):
 
     except Exception as e:
         update_progress(task_id, f'Error: {str(e)}', -1)
+
+def _track_items(metadata_dir):
+    """Read Apple metadata files into stable, testable Deezer work items."""
+    items = []
+    for filename in sorted(os.listdir(metadata_dir)):
+        if not filename.endswith('.txt'):
+            continue
+        metadata = recover_metadata(os.path.join(metadata_dir, filename))
+        items.append((filename, metadata, AppleTrackMetadata(
+            title=metadata.get('TITLE') or filename.rsplit('.txt', 1)[0].split(' ', 1)[-1],
+            artist=metadata.get('ARTIST') or metadata.get('ALBUMARTIST') or '',
+            album=metadata.get('ALBUM') or '',
+        )))
+    return items
+
+
+def _apply_track_metadata(audio_dir, metadata_dir, filename, metadata):
+    artists = metadata.get('ARTISTS')
+    artists_list = artists if isinstance(artists, list) else ([artists] if artists else [])
+    target = os.path.join(audio_dir, filename.rsplit('.txt', 1)[0] + '.m4a')
+    if not os.path.exists(target):
+        raise RuntimeError(f'Music file not found for metadata: {filename}')
+    add_metadata(target, os.path.join(metadata_dir, 'artwork.jpg'), artists_list,
+        metadata.get('ALBUM'), metadata.get('ALBUMARTIST'), metadata.get('ALBUMSORT'),
+        metadata.get('ARTIST'), metadata.get('ARTISTSORT'), metadata.get('COMMENT'),
+        metadata.get('COPYRIGHT'), metadata.get('DISCNUMBER'), metadata.get('GENRE'),
+        metadata.get('ITUNESADVISORY'), metadata.get('ITUNESALBUMID'),
+        metadata.get('ITUNESARTISTID'), metadata.get('ITUNESCATALOGID'),
+        metadata.get('ITUNESGENREID'), metadata.get('ITUNESMEDIATYPE'), metadata.get('TITLE'),
+        metadata.get('TITLESORT'), metadata.get('TOTALTRACKS'), metadata.get('TRACK'), metadata.get('YEAR'))
+
+
+def _job_workspace(task_id):
+    root = os.path.join(get_user_data_directory(), 'jobs', task_id)
+    metadata_dir = os.path.join(root, 'metadata')
+    audio_dir = os.path.join(root, 'output')
+    os.makedirs(metadata_dir, exist_ok=False)
+    os.makedirs(audio_dir, exist_ok=False)
+    return root, metadata_dir, audio_dir
+
+
+def download_with_progress(current_search, task_id):
+    """Run an isolated Apple metadata -> Deezer -> M4A job.
+
+    Job state never shares the legacy metadata directory, so cleanup is safe when
+    multiple browser requests start downloads at once.
+    """
+    root = None
+    try:
+        update_progress(task_id, 'Validating Deezer account...', 5)
+        deezer = DeezerClient()
+        deezer.current_session()
+        root, metadata_dir, audio_dir = _job_workspace(task_id)
+        _, library_dir = setup_directories()
+        update_progress(task_id, 'Extracting Apple Music metadata...', 12)
+
+        title, artist = current_search.get('title', ''), current_search.get('artist', '')
+        direct_url = current_search.get('direct_url')
+        single_song_only = current_search.get('single_song_only', False)
+        target_song_id = current_search.get('target_song_id')
+        if direct_url:
+            source_url, result_index = direct_url, current_search.get('id', 0)
+            single_song_only = single_song_only or bool(get_apple_music_song_id(direct_url))
+        else:
+            source_url = f"https://music.apple.com/us/search?term={title.replace(' ', '%20')}%20{artist.replace(' ', '%20')}"
+            result_index = current_search['id']
+        if single_song_only:
+            album_title, _ = ExtractSingleSongMetadata(source_url, result_index, metadata_dir, title, target_song_id=target_song_id)
+        else:
+            album_title, _ = ExtractMetadata(source_url, result_index, metadata_dir)
+
+        tracks = _track_items(metadata_dir)
+        if not tracks:
+            raise RuntimeError('No matching song metadata was found in the selected Apple Music release.')
+        update_progress(task_id, 'Matching tracks in Deezer...', 20)
+        for number, (filename, _, track) in enumerate(tracks, start=1):
+            match = deezer.match(track)
+            update_progress(task_id, f'Downloading and decoding {number}/{len(tracks)}: {track.title}', 20 + int(number / len(tracks) * 35))
+            deezer.download_mp3(match.candidate.id, Path(audio_dir) / (filename.rsplit('.txt', 1)[0] + '.mp3'))
+
+        update_progress(task_id, 'Converting files to M4A...', 60)
+        convert_all_mp3_to_m4a(audio_dir, task_id, delete_original=True)
+        update_progress(task_id, 'Adding Apple Music metadata...', 80)
+        for number, (filename, metadata, _) in enumerate(tracks, start=1):
+            _apply_track_metadata(audio_dir, metadata_dir, filename, metadata)
+            update_progress(task_id, f'Applied metadata to {number}/{len(tracks)}', 80 + int(number / len(tracks) * 14))
+
+        album_name = sanitize_filename(album_title)
+        destination = os.path.join(library_dir, album_name)
+        if os.path.exists(destination):
+            raise RuntimeError(f"Library album already exists: {album_name}. Remove it before downloading again.")
+        update_progress(task_id, 'Finalizing library...', 96)
+        os.replace(audio_dir, destination)
+        audio_dir = None
+        update_progress(task_id, 'Download completed', 100)
+    except DeezerError as exc:
+        update_progress(task_id, f'Error: {exc}', -1)
+    except Exception:
+        # Do not surface transport exceptions: they can include session-bound media URLs.
+        update_progress(task_id, 'Error: The download could not be completed. Please try again.', -1)
+    finally:
+        if root and os.path.exists(root):
+            shutil.rmtree(root, ignore_errors=True)
+
 
 def calculate_album_duration(folder_path):
 
@@ -1105,6 +1147,30 @@ def home():
             return show_search_results(form, confirm_form, title, artist, 0)
 
     return render_template('home.html', form=form, confirm_form=confirm_form, active_page='Home', selected_tab=selected_tab)
+
+@app.route('/api/deezer/status')
+def deezer_status():
+    try:
+        return jsonify({'connected': DeezerClient().is_connected()})
+    except DeezerError as exc:
+        return jsonify({'connected': False, 'message': str(exc)}), 503
+
+@app.route('/api/deezer/session', methods=['POST'])
+def save_deezer_session():
+    payload = request.get_json(silent=True) or {}
+    try:
+        DeezerClient().validate_and_save(payload.get('arl', ''))
+        return jsonify({'success': True, 'message': 'Deezer account connected.'})
+    except DeezerError as exc:
+        return jsonify({'success': False, 'message': str(exc)}), 400
+
+@app.route('/api/deezer/session', methods=['DELETE'])
+def clear_deezer_session():
+    try:
+        DeezerClient().clear_session()
+        return jsonify({'success': True})
+    except DeezerError as exc:
+        return jsonify({'success': False, 'message': str(exc)}), 503
 
 @app.route('/settings')
 def settings():

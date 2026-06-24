@@ -1,5 +1,5 @@
-# iTuneUp – Apple Music-style Downloads for Local Libraries
-<img src="resources/images/logo.png" width="24px" height="24px" align="center"> **iTuneUp** is a standalone Windows desktop application that lets you build a local `.m4a` music library styled after Apple Music, using content sourced from YouTube and metadata from Apple’s own public database. Unlike conventional downloaders, iTuneUp delivers an authentic, metadata-rich music collection — with cover art, track order, release dates, and more — just like purchased albums in iTunes.
+# iTuneUp – Deezer-sourced, Apple Music-tagged Local Libraries
+<img src="resources/images/logo.png" width="24px" height="24px" align="center"> **iTuneUp** is a standalone Windows desktop application that builds a local `.m4a` music library using Deezer catalog matching and Apple Music metadata. It preserves cover art, track order, release dates, and Apple Music tags.
 
 <div align="center">
   
@@ -11,7 +11,7 @@
 </div>
 
 ## ✨ Core Features
-- Download entire albums or individual tracks directly from YouTube via search.
+- Download entire albums or individual tracks through Deezer catalog matching.
 - Convert audio streams into `.m4a` (MPEG-4 Part 14) format using the **Advanced Audio Coding (AAC)** codec — the same audio compression used by Apple Music.
 - Enrich downloaded files with Apple Music metadata, including:
   * Track title
@@ -29,16 +29,18 @@
 ## 📦 Technologies Used
 - **Language:** Python 3.12.7
 - **GUI:** [Flask](https://flask.palletsprojects.com/en/stable/) backend + [PyWebView](https://pywebview.flowrl.com/) native shell
-- **Download engine:** [yt-dlp](https://github.com/yt-dlp/yt-dlp) -- for high-accuracy YouTube media downloading
+- **Download engine:** Native Python Deezer source adapter with conservative track matching
 - **Audio conversion:** [ffmpeg](https://ffmpeg.org/) -- for audio conversion and stream extraction
 - **Metadata embedding:** [mutagen](https://mutagen.readthedocs.io/) -- for embedding metadata into `.m4a` files
 - **Metadata scraping:** Selenium + requests – to scrape and retrieve metadata from Apple Music’s public web pages
+- **Credential storage:** Windows Credential Manager via `keyring`; Deezer session material is never written to iTuneUp settings or logs
 
 ## 🖥️ System Requirements
 - **Operating System:** Windows 10 (64 bits) or later
 - **Disk Space:** ~510 MB (excluding downloaded music)
 - **Internet Access:** Required for metadata & download
 - **Google Chrome:** Required for Apple Music scraping
+- **Authorized Deezer account:** Required. Connect it in Settings before downloading.
 ```
 ⚠️ Python & dependencies are not required, as iTuneUp is packaged as a complete .exe app.
 ```
@@ -112,4 +114,4 @@ Once you've used **iTuneUp** to download and tag `.m4a` tracks with rich metadat
   
 - You’ll see the newly added album with full Apple-style formatting: proper cover art, album info, and track structure.
 
-🎉 Congratulations! You now have YouTube-sourced music enriched with **Apple Music metadata** on your iPhone — **no subscriptions required**, and fully integrated with iTunes' ecosystem.
+🎉 Your Deezer-sourced music is enriched with **Apple Music metadata** and ready for your local iTunes library.

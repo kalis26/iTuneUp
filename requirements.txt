@@ -1,0 +1,10 @@
+Flask
+Flask-WTF
+mutagen
+pydub
+requests
+selenium
+webdriver-manager
+pywebview
+cryptography
+keyring

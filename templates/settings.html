@@ -23,6 +23,23 @@
                 </div>
             </div>
         </div>
+
+        <div class="settings-section">
+            <h3>Deezer account</h3>
+            <p class="setting-description">Downloads use Deezer catalog matching. Connect only an account you are authorized to use; the session token is stored in Windows Credential Manager and is never saved in iTuneUp settings.</p>
+            <div class="setting-item deezer-setting">
+                <div class="setting-info">
+                    <span class="setting-title" id="deezer-status">Checking Deezer connection…</span>
+                    <span class="setting-description">Paste your Deezer ARL session token to connect or replace the current account.</span>
+                </div>
+            </div>
+            <div class="deezer-controls">
+                <input type="password" id="deezer-arl" class="form-input" autocomplete="off" placeholder="Deezer ARL session token">
+                <button type="button" id="deezer-connect" class="form-button">Connect</button>
+                <button type="button" id="deezer-disconnect" class="form-button">Disconnect</button>
+            </div>
+            <p id="deezer-message" class="setting-description" aria-live="polite"></p>
+        </div>
     </div>
 </div>
 

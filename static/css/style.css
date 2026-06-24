@@ -1520,6 +1520,16 @@ body.flash-active > *:not(.flash-overlay) {
     border-bottom: none;
 }
 
+.deezer-controls {
+    display: flex;
+    gap: 10px;
+    margin-top: 14px;
+    align-items: center;
+}
+
+.deezer-controls .form-input { flex: 1; }
+.deezer-controls .form-button { width: auto; min-width: 100px; }
+
 .setting-info {
     display: flex;
     flex-direction: column;
