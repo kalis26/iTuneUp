@@ -1,117 +1,86 @@
-# iTuneUp – Deezer-sourced, Apple Music-tagged Local Libraries
-<img src="resources/images/logo.png" width="24px" height="24px" align="center"> **iTuneUp** is a standalone Windows desktop application that builds a local `.m4a` music library using Deezer catalog matching and Apple Music metadata. It preserves cover art, track order, release dates, and Apple Music tags.
+# iTuneUp
+
+<p align="center">
+  <img src="resources/images/logo.png" width="64" alt="iTuneUp logo">
+</p>
+
+<p align="center">
+  Windows desktop application for creating and organizing metadata-rich M4A music libraries with Apple Music metadata and artwork.
+</p>
 
 <div align="center">
-  
-  [![stars](https://img.shields.io/github/stars/kalis26/iTuneUp)](https://github.com/kalis26/iTuneUp/stargazers)
-  [![forks](https://img.shields.io/github/forks/kalis26/iTuneUp)](https://github.com/kalis26/iTuneUp/forks)
-  [![issues](https://img.shields.io/github/issues/kalis26/iTuneUp?color=orange)](https://github.com/kalis26/iTuneUp/issues)
-  [![license](https://img.shields.io/github/license/kalis26/iTuneUp)](https://github.com/kalis26/iTuneUp/blob/main/LICENSE)
-  
+
+[![Stars](https://img.shields.io/github/stars/kalis26/iTuneUp)](https://github.com/kalis26/iTuneUp/stargazers)
+[![Forks](https://img.shields.io/github/forks/kalis26/iTuneUp)](https://github.com/kalis26/iTuneUp/forks)
+[![Issues](https://img.shields.io/github/issues/kalis26/iTuneUp?color=orange)](https://github.com/kalis26/iTuneUp/issues)
+[![License](https://img.shields.io/github/license/kalis26/iTuneUp)](https://github.com/kalis26/iTuneUp/blob/main/LICENSE)
+
 </div>
 
-## ✨ Core Features
-- Download entire albums or individual tracks through Deezer catalog matching.
-- Convert audio streams into `.m4a` (MPEG-4 Part 14) format using the **Advanced Audio Coding (AAC)** codec — the same audio compression used by Apple Music.
-- Enrich downloaded files with Apple Music metadata, including:
-  * Track title
-  * Album and artist name
-  * Release date
-  * Album artwork (632×632px high-quality JPEG)
-  * Track order, genre, and Apple Music-specific tags
-- Automatically name and organize files for proper integration with iTunes or third-party players.
-- Create a truly **"Apple Music–like" experience** for your local music collection — without subscriptions.
-- Native Windows installer with:
-  * Shortcut creation
-  * Uninstaller
-- Modern UI powered by a built-in WebView interface (no browser needed)
+## Overview
 
-## 📦 Technologies Used
-- **Language:** Python 3.12.7
-- **GUI:** [Flask](https://flask.palletsprojects.com/en/stable/) backend + [PyWebView](https://pywebview.flowrl.com/) native shell
-- **Download engine:** Native Python Deezer source adapter with conservative track matching
-- **Audio conversion:** [ffmpeg](https://ffmpeg.org/) -- for audio conversion and stream extraction
-- **Metadata embedding:** [mutagen](https://mutagen.readthedocs.io/) -- for embedding metadata into `.m4a` files
-- **Metadata scraping:** Selenium + requests – to scrape and retrieve metadata from Apple Music’s public web pages
-- **Credential storage:** Windows Credential Manager via `keyring`; Deezer session material is never written to iTuneUp settings or logs
+iTuneUp uses Apple Music as the metadata and artwork source, then uses Deezer catalog matching to locate the corresponding recording. Completed files are converted to M4A, tagged with Apple Music metadata, and organized into an album-based local library suitable for iTunes and compatible media players.
 
-## 🖥️ System Requirements
-- **Operating System:** Windows 10 (64 bits) or later
-- **Disk Space:** ~510 MB (excluding downloaded music)
-- **Internet Access:** Required for metadata & download
-- **Google Chrome:** Required for Apple Music scraping
-- **Authorized Deezer account:** Required. Connect it in Settings before downloading.
-```
-⚠️ Python & dependencies are not required, as iTuneUp is packaged as a complete .exe app.
-```
+## Features
 
-## 📂 Installation & Uninstallation
-- Download `iTuneUp-Setup.exe` from the [Releases](https://github.com/kalis26/iTuneUp/releases)
-- Run the installer — you can:
-  * Add desktop/start menu shortcut
-- To uninstall, go to **Control Panel > Apps > iTuneUp**, or run `Uninstall iTuneUp` from the Start menu
+- Downloads full albums or individual tracks from Apple Music search results or direct Apple Music URLs.
+- Matches tracks against Deezer using title, artist, album, and duration where available.
+- Rejects uncertain matches instead of selecting an arbitrary recording.
+- Connects a Deezer account through a browser-based sign-in flow; iTuneUp stores session data in Windows Credential Manager.
+- Converts downloaded MP3 audio to M4A using FFmpeg.
+- Adds Apple Music metadata, including title, artist, album, release date, artwork, track number, genre, and Apple-specific tags.
+- Uses isolated job workspaces to prevent temporary files from different downloads from colliding.
+- Provides a native Windows installer, Start Menu entry, optional desktop shortcut, and uninstaller.
 
-## 🔒 License
-Licensed under the [MIT License](https://github.com/kalis26/iTuneUp/blob/main/LICENSE)
+## Requirements
 
-## Use Cases
-- Build a curated, metadata-rich `.m4a` library using free online content.
-- Sync personalized albums with iTunes, iOS devices, or third-party players.
-- Archive rare or live recordings with high-efficiency encoding and clean metadata.
-- Combine streaming convenience with local ownership and detailed music info.
+- Windows 10 or later, 64-bit.
+- Google Chrome, used for Apple Music metadata extraction and Deezer account sign-in.
+- An authorized Deezer account.
+- Internet access.
 
-## How to Add to iTunes and Sync with iPhone/iPad
-Once you've used **iTuneUp** to download and tag `.m4a` tracks with rich metadata, you can seamlessly add them to your iTunes library on PC and sync them to your iPhone or iPad for a native Apple Music–like experience.
-### 1st - Add Songs to iTunes Library
-1. Go to the iTunes <img src="https://help.apple.com/assets/65F888B2B2F4A0D0EA005BE5/65F888B35B54CF6A740B68EA/en_US/f344938417f8d295c94901b517e140f1.png" alt="" height="16" width="16" originalimagename="GlobalArt/xicnitns.png"> app on your Windows PC (latest version recommended).
-   
-2. In the menu bar, go to: **File > Add Folder to Library...**
-<img src="resources/images/AddFolder.png">
+Python and project dependencies are not required when using the packaged installer.
 
-3. Navigate to the `{album_name}/` folder generated by **iTuneUp** (or wherever you chose to save your files).
+## Installation
 
-4. Select the folder containing the album or tracks and click **Select Folder**.
+1. Download `iTuneUp-Setup.exe` from the [Releases](https://github.com/kalis26/iTuneUp/releases) page.
+2. Run the installer and complete the setup steps.
+3. Launch iTuneUp from the Start Menu or desktop shortcut.
 
-5. iTunes will import the songs, retaining:
-  * Track order
-  * Album name
-  * Artist(s)
-  * Artwork
-  * Genre
-  * Release year
-  * And many more tags.
+To uninstall, use **Installed apps** in Windows Settings or select **Uninstall iTuneUp** from the Start Menu.
 
-🟢 If metadata was properly injected by iTuneUp, you'll see a fully-tagged album with its cover art — just like official Apple Music content. 
+## Using iTuneUp
 
-### 2nd - Enable Manual or Automatic Sync
-1. Connect your iPhone/iPad to your computer using a USB cable.
- 
-2. iTunes will recognize your device and show it in the top-left corner. Click on the device icon. 
-<img src="resources/images/Device.png" width="250px">
+1. Launch iTuneUp and connect your Deezer account when prompted.
+2. Search for an album or song, or paste an Apple Music URL.
+3. Confirm the Apple Music result that should provide metadata and artwork.
+4. Wait while iTuneUp matches, downloads, converts, and tags the selected tracks.
+5. Open the **Library** tab to access the completed album folder.
 
-3. Select a type of content you want to sync in the sidebar (Music in our case).
-<img src="resources/images/Sidebar.png" height="200px">
+If iTuneUp cannot find a high-confidence Deezer match, it stops the job and reports the affected track instead of downloading an uncertain recording.
 
-  *Note:* If you use iCloud Photos and Apple Music, your photos and music are synced automatically with iCloud. When you click Music or Photos, no options appear for syncing.
+## Adding Music to iTunes
 
-4. Select the Sync checkbox, then select the items you want to sync automatically each time you connect your device. 
-<img src="resources/images/Sync.png" height="200px">
+1. In iTunes, select **File > Add Folder to Library**.
+2. Select the album folder created by iTuneUp.
+3. iTunes imports the M4A files with their title, artist, album, artwork, track order, genre, and release-date metadata.
+4. Sync the imported music to a connected iPhone or iPad through iTunes if required.
 
-5. By default, iTunes syncs your device whenever you connect it to your computer. If you want iTunes to ask you before syncing, do one of the following:
-  * *Require a prompt before syncing this device:* Click Summary, then deselect “Automatically sync when this [*device*] is connected.”
-  * *Require a prompt before syncing all devices*: Choose Edit > Preferences, click Devices, then select “Prevent iPods, iPhones, and iPads from syncing automatically.”
+## Technical Overview
 
-6. When you’re ready to sync, click Apply.
+- **Desktop shell:** Flask and PyWebView
+- **Apple Music metadata extraction:** Selenium and requests
+- **Deezer matching and acquisition:** Native Python adapter
+- **Audio conversion:** FFmpeg
+- **M4A metadata:** Mutagen
+- **Credential storage:** Windows Credential Manager through `keyring`
 
-<img src="https://support.apple.com/clientside/build/img/tip.svg" height="20px"> **Tip:** To automatically sync a connected device at any time, choose File > Devices > Sync [*device name*].\
-\
-**WARNING:** If you delete an automatically synced item from your iTunes library, the deleted item is removed from your device the next time you sync.
+## Limitations
 
-### 3rd - Enjoy Your Music on Your iPhone/iPad
-- Once syncing is complete, open the Music app on your iPhone or iPad.
-  
-- Navigate to: **Library > Albums**
-  
-- You’ll see the newly added album with full Apple-style formatting: proper cover art, album info, and track structure.
+- Deezer availability can vary by account entitlement and region.
+- Chrome must be installed and kept up to date for browser-driven metadata extraction and Deezer sign-in.
+- The application requires a network connection for metadata, catalog matching, and audio acquisition.
 
-🎉 Your Deezer-sourced music is enriched with **Apple Music metadata** and ready for your local iTunes library.
+## License
+
+iTuneUp is released under the [MIT License](LICENSE).
